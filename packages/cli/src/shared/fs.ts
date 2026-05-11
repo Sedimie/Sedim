@@ -1,5 +1,5 @@
-import * as path from 'node:path'
-import * as fs from 'fs-extra'
+import path from 'node:path'
+import fs from 'fs-extra'
 import { DetectionError, WriteError } from './errors'
 
 export async function exists(filePath : string) : Promise<boolean> {
