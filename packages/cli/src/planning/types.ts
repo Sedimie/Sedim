@@ -50,6 +50,15 @@ export interface AppEntrypoint {
   exportName: string | null          // e.g. "app", "default"
 }
 
+// a precise location found by ts-morph AST analysis
+// this is what the writer uses to inject code without guessing
+export interface InjectionAnchor {
+  file: string                       // relative path to the file
+  anchorText: string                 // the exact text to anchor against in the file
+  position: 'before' | 'after'      // where to insert relative to anchor
+  description: string                // human-readable: "after last app.use() call"
+}
+
 export interface CodeArchitecture {
   routerStyle: RouterStyle
   layoutStyle: LayoutStyle           // Next.js specific, 'unknown' for others
@@ -58,6 +67,9 @@ export interface CodeArchitecture {
   providersFile: string | null       // existing providers wrapper if any
   hasBarrelExports: boolean          // src/index.ts that re-exports things
   importStyle: 'named' | 'default' | 'mixed'
+  // precise injection points found by AST analysis
+  // keyed by InjectionType — only populated for types the detector could find
+  injectionAnchors: Partial<Record<InjectionType, InjectionAnchor>>
 }
 
 export interface ConflictSignals {
@@ -226,4 +238,63 @@ export interface ModuleManifest {
     frameworks: Framework[]
     orms: ORM[]
   }
+}
+
+// ============================================================
+// PlanConfig — what a module provides to the thinker
+// the thinker resolves this against DetectedContext to produce InstallPlan
+// ============================================================
+
+export interface TemplateConfig {
+  templateKey: string
+  // function because output path depends on detected framework/structure
+  // e.g. Next.js app router → src/app/api/auth/route.ts
+  //      Next.js pages router → src/pages/api/auth.ts
+  outputPath: (ctx: DetectedContext) => string
+  overwriteStrategy: 'skip' | 'overwrite' | 'ask'
+}
+
+export interface InjectionVariant {
+  payload: string              // the code string to inject
+  anchor: string               // what to find in the file to anchor against
+  position: 'before' | 'after'
+}
+
+export interface InjectionConfig {
+  type: InjectionType
+  // which file to inject into — depends on framework
+  target: (ctx: DetectedContext) => string | null
+  // framework-specific payloads — thinker picks the matching variant
+  variants: Partial<Record<Framework, InjectionVariant>>
+  // used when no framework variant matches
+  fallback?: InjectionVariant
+}
+
+export interface EnvVarConfig {
+  key: string
+  description: string
+  example?: string
+  required: boolean
+}
+
+export interface PeerContract {
+  module: string               // e.g. 'auth'
+  provides: string[]           // what it provides: ['getCurrentUser', 'getSession']
+  required: boolean            // hard dependency or optional enhancement
+}
+
+export interface PlanConfig {
+  moduleName: string
+  version: string
+  // files the module wants to stamp — thinker resolves outputPath per project
+  templates: TemplateConfig[]
+  // code injections needed — thinker picks the right variant per framework
+  injections: InjectionConfig[]
+  dependencies: string[]
+  devDependencies: string[]
+  envVars: EnvVarConfig[]
+  // tables this module creates — used for conflict detection against existing schema
+  schemaTables: string[]
+  // what this module needs from other modules — keeps modules decoupled
+  peerContracts: PeerContract[]
 }
