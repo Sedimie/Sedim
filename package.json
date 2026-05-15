@@ -13,11 +13,11 @@
   "lint-staged": {
     "packages/cli/src/**/*.ts": [
       "biome check --write --no-errors-on-unmatched",
-      "vitest run --reporter=verbose --project=cli"
+      "vitest run --reporter=verbose --project=cli --passWithNoTests"
     ],
     "packages/cli/tests/**/*.ts": [
       "biome check --write --no-errors-on-unmatched",
-      "vitest run --reporter=verbose --project=cli"
+      "vitest run --reporter=verbose --project=cli --passWithNoTests"
     ]
   },
   "devDependencies": {
