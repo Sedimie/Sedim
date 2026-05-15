@@ -3,6 +3,7 @@ import { detect } from '../detector/index'
 import { isSedimInitialised } from '../config/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { buildPlan } from '../thinker/index'
+import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
 import { findProjectRoot } from '../shared/fs'
 import { renderPlanSummary } from '../planning/diff-renderer'
 
@@ -34,7 +35,8 @@ export async function runPlan(moduleName: string): Promise<void> {
 
   // plan with empty selections — shows the default plan
   const planSpinner = ui.createSpinner('Building plan...')
-  const plan = await buildPlan(ctx, manifest, {}).catch(err => {
+  const planConfig = manifestToPlanConfig(manifest, [], ctx)
+  const plan = await buildPlan(ctx, planConfig, []).catch(err => {
     planSpinner.fail('Planning failed')
     ui.showError(err)
     process.exit(1)

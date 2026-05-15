@@ -4,6 +4,7 @@ import { readSedimConfig, isSedimInitialised } from '../config/index'
 import { readSession, writeSession } from '../session/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { buildPlan } from '../thinker/index'
+import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
 import { applyPlan } from '../writer/index'
 import { findProjectRoot } from '../shared/fs'
 import { logger } from '../telemetry/logger'
@@ -97,9 +98,19 @@ export async function runAdd(
   ui.logSection('Planning')
   const planSpinner = ui.createSpinner('Building install plan...')
 
+  // selectedFeatures is the flat list of what the user picked
+  const selectedFeatures = [
+    ...((selections.providers as string[]) ?? []),
+    ...((selections.ui as string[]) ? [selections.ui as string] : []),
+    ...((selections.authorization as string[]) ? [selections.authorization as string] : []),
+  ]
+
+  // convert manifest to PlanConfig — real modules will provide their own
+  const planConfig = manifestToPlanConfig(manifest, selectedFeatures, ctx)
+
   let plan
   try {
-    plan = await buildPlan(ctx, manifest, selections)
+    plan = await buildPlan(ctx, planConfig, selectedFeatures)
     planSpinner.stop('Plan ready')
   } catch (err) {
     planSpinner.fail('Planning failed')
@@ -113,6 +124,35 @@ export async function runAdd(
     ui.logNote('Dry run — no files written.', 'Dry Run')
     ui.showOutro('Dry run complete.')
     return
+  }
+
+  // ── resolve pending conflicts before writing ─────────────
+  // any conflict still marked pending-user-choice must be resolved
+  // before the writer runs — writer only executes, never decides
+  const pendingConflicts = plan.conflictActions.filter(
+    c => c.resolution === 'pending-user-choice'
+  )
+
+  if (pendingConflicts.length > 0 && !options.force) {
+    ui.logSection('Conflicts')
+
+    for (const conflict of pendingConflicts) {
+      ui.showConflict(conflict)
+
+      if (conflict.level === 'full') {
+        ui.logWarn('Full conflict detected — cannot proceed without --force.')
+        ui.showCancel('Cancelled — no files written.')
+      }
+
+      const resolution = await ui.select<'skip' | 'overwrite'>(
+        `How to handle "${conflict.file}"?`,
+        [
+          { value: 'skip',      label: 'Skip',      hint: 'leave the existing file untouched' },
+          { value: 'overwrite', label: 'Overwrite',  hint: 'replace with the new version' },
+        ]
+      )
+      conflict.resolution = resolution
+    }
   }
 
   // ── confirm before write ─────────────────────────────────

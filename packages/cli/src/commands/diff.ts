@@ -3,6 +3,7 @@ import { detect } from '../detector/index'
 import { isSedimInitialised } from '../config/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { buildPlan } from '../thinker/index'
+import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
 import { findProjectRoot, exists, readText } from '../shared/fs'
 import path from 'node:path'
 
@@ -29,7 +30,8 @@ export async function runDiff(moduleName: string): Promise<void> {
     process.exit(1)
   })
 
-  const plan = await buildPlan(ctx, manifest, {}).catch(err => {
+  const planConfig = manifestToPlanConfig(manifest, [], ctx)
+  const plan = await buildPlan(ctx, planConfig, []).catch(err => {
     ui.showError(err)
     process.exit(1)
   })
