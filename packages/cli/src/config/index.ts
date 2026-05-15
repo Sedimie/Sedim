@@ -1,3 +1,3 @@
-export { readSedimConfig, isSedimInitialised } from './read-sedim-config'
-export { writeSedimConfig, buildConfig } from './write-sedim-config'
+export { isSedimInitialised, readSedimConfig } from './read-sedim-config'
 export { validateSedimConfig } from './validate-sedim-config'
+export { buildConfig, writeSedimConfig } from './write-sedim-config'

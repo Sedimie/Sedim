@@ -22,37 +22,61 @@ export class SedimError extends Error {
 // ============================================================
 
 export class DetectionError extends SedimError {
-  constructor(message: string, cause?: unknown, nextAction = 'Run `sedim doctor` to diagnose the issue.') {
+  constructor(
+    message: string,
+    cause?: unknown,
+    nextAction = 'Run `sedim doctor` to diagnose the issue.',
+  ) {
     super(message, nextAction, cause)
   }
 }
 
 export class PlanError extends SedimError {
-  constructor(message: string, cause?: unknown, nextAction = 'Run `sedim plan <module>` to inspect the plan before retrying.') {
+  constructor(
+    message: string,
+    cause?: unknown,
+    nextAction = 'Run `sedim plan <module>` to inspect the plan before retrying.',
+  ) {
     super(message, nextAction, cause)
   }
 }
 
 export class ConflictError extends SedimError {
-  constructor(message: string, cause?: unknown, nextAction = 'Run `sedim diff <module>` to review conflicts before proceeding.') {
+  constructor(
+    message: string,
+    cause?: unknown,
+    nextAction = 'Run `sedim diff <module>` to review conflicts before proceeding.',
+  ) {
     super(message, nextAction, cause)
   }
 }
 
 export class WriteError extends SedimError {
-  constructor(message: string, cause?: unknown, nextAction = 'Check file permissions and try again. No files were partially written.') {
+  constructor(
+    message: string,
+    cause?: unknown,
+    nextAction = 'Check file permissions and try again. No files were partially written.',
+  ) {
     super(message, nextAction, cause)
   }
 }
 
 export class SessionError extends SedimError {
-  constructor(message: string, cause?: unknown, nextAction = 'Run `sedim continue <module>` to resume, or delete .sedim/session.json to start fresh.') {
+  constructor(
+    message: string,
+    cause?: unknown,
+    nextAction = 'Run `sedim continue <module>` to resume, or delete .sedim/session.json to start fresh.',
+  ) {
     super(message, nextAction, cause)
   }
 }
 
 export class RegistryError extends SedimError {
-  constructor(message: string, cause?: unknown, nextAction = 'Check your internet connection or set a local registry in sedim.config.ts.') {
+  constructor(
+    message: string,
+    cause?: unknown,
+    nextAction = 'Check your internet connection or set a local registry in sedim.config.ts.',
+  ) {
     super(message, nextAction, cause)
   }
 }

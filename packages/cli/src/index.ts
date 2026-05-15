@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
-import { CLI_VERSION } from './shared/constants'
-import { runInit } from './commands/init'
 import { runAdd } from './commands/add'
 import { runContinue } from './commands/continue'
-import { runDoctor } from './commands/doctor'
-import { runPlan } from './commands/plan'
 import { runDiff } from './commands/diff'
+import { runDoctor } from './commands/doctor'
+import { runInit } from './commands/init'
+import { runPlan } from './commands/plan'
+import { CLI_VERSION } from './shared/constants'
 import * as ui from './showbaby/index'
 
 const program = new Command()
@@ -20,7 +20,7 @@ program
   .command('init')
   .description('Detect your stack and initialise sedim in this project')
   .option('-f, --force', 'Reinitialise even if already set up')
-  .action(async (opts) => {
+  .action(async opts => {
     await runInit({ force: opts.force }).catch(handleTopLevelError)
   })
 
@@ -36,7 +36,7 @@ program
 program
   .command('continue [module]')
   .description('Resume an interrupted module install')
-  .action(async (module) => {
+  .action(async module => {
     await runContinue(module).catch(handleTopLevelError)
   })
 
@@ -50,14 +50,14 @@ program
 program
   .command('plan <module>')
   .description('Compute and preview the install plan without writing files')
-  .action(async (module) => {
+  .action(async module => {
     await runPlan(module).catch(handleTopLevelError)
   })
 
 program
   .command('diff <module>')
   .description('Show per-file diffs of what a module install would change')
-  .action(async (module) => {
+  .action(async module => {
     await runDiff(module).catch(handleTopLevelError)
   })
 

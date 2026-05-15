@@ -1,5 +1,5 @@
-import path from 'node:path'
 import fs from 'node:fs'
+import path from 'node:path'
 import { execa } from 'execa'
 import type { PackageManager } from '../planning/types'
 import { WriteError } from './errors'
@@ -16,7 +16,7 @@ export function detectPackageManager(projectRoot: string): PackageManager {
 export async function installDependencies(
   packages: string[],
   projectRoot: string,
-  dev = false
+  dev = false,
 ): Promise<void> {
   const pm = detectPackageManager(projectRoot)
 

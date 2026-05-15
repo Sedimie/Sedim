@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { exists, readJSON, readText } from '../shared/fs'
 import type { SchemaSignals } from '../planning/types'
+import { exists, readJSON, readText } from '../shared/fs'
 
 type PkgJSON = {
   dependencies?: Record<string, string>
@@ -24,7 +24,7 @@ const KNOWN_AUTH_PACKAGES = [
   'clerk',
   '@clerk/nextjs',
   '@clerk/clerk-sdk-node',
-  'jose',               // JWT library, strong signal
+  'jose', // JWT library, strong signal
   'jsonwebtoken',
 ]
 
@@ -78,7 +78,9 @@ export async function detectAuthSignals(projectRoot: string): Promise<SchemaSign
         existingAuthDetected = true
       }
     }
-  } catch { /* no package.json */ }
+  } catch {
+    /* no package.json */
+  }
 
   // check for auth setup files
   for (const file of AUTH_FILE_CANDIDATES) {
@@ -99,10 +101,10 @@ export async function detectAuthSignals(projectRoot: string): Promise<SchemaSign
         const content = await readText(filePath)
 
         // extract table names — works for both drizzle and prisma syntax
-        const drizzleTables = [...content.matchAll(/export const (\w+)\s*=\s*pgTable|mysqlTable|sqliteTable/g)]
-          .map(m => m[1])
-        const prismaTables = [...content.matchAll(/^model (\w+)\s*\{/gm)]
-          .map(m => m[1])
+        const drizzleTables = [
+          ...content.matchAll(/export const (\w+)\s*=\s*pgTable|mysqlTable|sqliteTable/g),
+        ].map(m => m[1])
+        const prismaTables = [...content.matchAll(/^model (\w+)\s*\{/gm)].map(m => m[1])
 
         tables.push(...drizzleTables, ...prismaTables)
 
@@ -122,7 +124,9 @@ export async function detectAuthSignals(projectRoot: string): Promise<SchemaSign
             break
           }
         }
-      } catch { /* unreadable schema */ }
+      } catch {
+        /* unreadable schema */
+      }
     }
   }
 

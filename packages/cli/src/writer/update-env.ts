@@ -1,13 +1,13 @@
 import path from 'node:path'
-import { exists, readText, writeText } from '../shared/fs'
 import { WriteError } from '../shared/errors'
+import { exists, readText, writeText } from '../shared/fs'
 
 // merges new env vars into .env without overwriting existing values
 // if .env doesn't exist, creates it
 // never overwrites a key that already has a value — user owns their secrets
 export async function updateEnv(
   projectRoot: string,
-  envVars: Array<{ key: string; description: string; example?: string }>
+  envVars: Array<{ key: string; description: string; example?: string }>,
 ): Promise<void> {
   if (envVars.length === 0) return
 
@@ -19,7 +19,7 @@ export async function updateEnv(
     existing
       .split('\n')
       .filter(line => line.includes('=') && !line.startsWith('#'))
-      .map(line => line.split('=')[0].trim())
+      .map(line => line.split('=')[0].trim()),
   )
 
   const newLines: string[] = []

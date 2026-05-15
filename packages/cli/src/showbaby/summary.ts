@@ -1,6 +1,6 @@
 import * as clack from '@clack/prompts'
 import chalk from 'chalk'
-import type { DetectedContext, InstallPlan, ConflictAction } from '../planning/types'
+import type { ConflictAction, DetectedContext, InstallPlan } from '../planning/types'
 
 // ============================================================
 // showDetectionSummary — what the detector found
@@ -10,20 +10,22 @@ import type { DetectedContext, InstallPlan, ConflictAction } from '../planning/t
 
 export function showDetectionSummary(ctx: DetectedContext): void {
   const confidenceTag = (c: string) =>
-    c === 'high'   ? chalk.green('high ✓') :
-    c === 'medium' ? chalk.yellow('medium ~') :
-                     chalk.red('low ?')
+    c === 'high'
+      ? chalk.green('high ✓')
+      : c === 'medium'
+        ? chalk.yellow('medium ~')
+        : chalk.red('low ?')
 
   const row = (label: string, value: string, confidence: string) =>
     `  ${chalk.dim(label.padEnd(14))}${chalk.white(value.padEnd(12))}${confidenceTag(confidence)}`
 
   const lines = [
-    row('framework',    ctx.framework.value,    ctx.framework.confidence),
-    row('orm',          ctx.orm.value,           ctx.orm.confidence),
-    row('db',           ctx.db.value,            ctx.db.confidence),
-    row('language',     ctx.language.value,      ctx.language.confidence),
-    row('modules',      ctx.moduleSystem.value,  ctx.moduleSystem.confidence),
-    row('pkg manager',  ctx.packageManager,      'high'),
+    row('framework', ctx.framework.value, ctx.framework.confidence),
+    row('orm', ctx.orm.value, ctx.orm.confidence),
+    row('db', ctx.db.value, ctx.db.confidence),
+    row('language', ctx.language.value, ctx.language.confidence),
+    row('modules', ctx.moduleSystem.value, ctx.moduleSystem.confidence),
+    row('pkg manager', ctx.packageManager, 'high'),
   ]
 
   // surface evidence for anything not high confidence
@@ -41,7 +43,9 @@ export function showDetectionSummary(ctx: DetectedContext): void {
 
   // flag conflicts prominently
   if (ctx.conflicts.existingAuthDetected) {
-    clack.log.warn(chalk.yellow('Existing auth detected — conflicts will be reviewed before any writes.'))
+    clack.log.warn(
+      chalk.yellow('Existing auth detected — conflicts will be reviewed before any writes.'),
+    )
     for (const signal of ctx.conflicts.signals) {
       clack.log.message(chalk.dim(`  ↳ ${signal}`))
     }
@@ -111,7 +115,8 @@ export function showEndReport(plan: InstallPlan, elapsedMs: number): void {
   const deps = plan.dependenciesToInstall.length + plan.devDependenciesToInstall.length
 
   lines.push(`  ${chalk.green('✓')} ${created} file${created !== 1 ? 's' : ''} created`)
-  if (modified) lines.push(`  ${chalk.green('✓')} ${modified} file${modified !== 1 ? 's' : ''} modified`)
+  if (modified)
+    lines.push(`  ${chalk.green('✓')} ${modified} file${modified !== 1 ? 's' : ''} modified`)
   if (deps) lines.push(`  ${chalk.green('✓')} ${deps} package${deps !== 1 ? 's' : ''} installed`)
 
   if (plan.envVarsToAdd.length) {
@@ -136,9 +141,11 @@ export function showEndReport(plan: InstallPlan, elapsedMs: number): void {
 
 export function showConflict(conflict: ConflictAction): void {
   const levelColor =
-    conflict.level === 'full'    ? chalk.red :
-    conflict.level === 'partial' ? chalk.yellow :
-    chalk.green
+    conflict.level === 'full'
+      ? chalk.red
+      : conflict.level === 'partial'
+        ? chalk.yellow
+        : chalk.green
 
   clack.note(
     [
@@ -146,7 +153,7 @@ export function showConflict(conflict: ConflictAction): void {
       `  ${chalk.bold('level')}   ${levelColor(conflict.level)}`,
       `  ${chalk.bold('reason')}  ${chalk.dim(conflict.description)}`,
     ].join('\n'),
-    chalk.yellow('Conflict Detected')
+    chalk.yellow('Conflict Detected'),
   )
 }
 

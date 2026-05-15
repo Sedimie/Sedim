@@ -1,8 +1,8 @@
+import { unlink } from 'node:fs/promises'
 import path from 'node:path'
-import { exists } from '../shared/fs'
 import { SEDIM_SESSION_FILE } from '../shared/constants'
 import { SessionError } from '../shared/errors'
-import { unlink } from 'node:fs/promises'
+import { exists } from '../shared/fs'
 
 export async function clearSession(projectRoot: string): Promise<void> {
   const sessionPath = path.join(projectRoot, SEDIM_SESSION_FILE)

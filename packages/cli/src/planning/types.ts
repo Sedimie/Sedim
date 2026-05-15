@@ -32,40 +32,40 @@ export type Detected<T> = {
 // ============================================================
 
 export interface ProjectStructure {
-  srcDir: string | null              // e.g. "src" or "app" or null if flat
-  routeEntrypoints: string[]         // files that define routes
-  middlewareCandidates: string[]     // files likely to register middleware
+  srcDir: string | null // e.g. "src" or "app" or null if flat
+  routeEntrypoints: string[] // files that define routes
+  middlewareCandidates: string[] // files likely to register middleware
 }
 
 export interface SchemaSignals {
-  tables: string[]                   // table names found in schema files
-  probableUserTable: string | null   // best guess at the users table
-  authSignals: string[]              // e.g. ["found password_hash column", "lucia detected in deps"]
+  tables: string[] // table names found in schema files
+  probableUserTable: string | null // best guess at the users table
+  authSignals: string[] // e.g. ["found password_hash column", "lucia detected in deps"]
   existingAuthDetected: boolean
 }
 
 export interface AppEntrypoint {
-  file: string                       // e.g. "src/app.ts"
-  exportsAppInstance: boolean        // does it export the framework app object?
-  exportName: string | null          // e.g. "app", "default"
+  file: string // e.g. "src/app.ts"
+  exportsAppInstance: boolean // does it export the framework app object?
+  exportName: string | null // e.g. "app", "default"
 }
 
 // a precise location found by ts-morph AST analysis
 // this is what the writer uses to inject code without guessing
 export interface InjectionAnchor {
-  file: string                       // relative path to the file
-  anchorText: string                 // the exact text to anchor against in the file
-  position: 'before' | 'after'      // where to insert relative to anchor
-  description: string                // human-readable: "after last app.use() call"
+  file: string // relative path to the file
+  anchorText: string // the exact text to anchor against in the file
+  position: 'before' | 'after' // where to insert relative to anchor
+  description: string // human-readable: "after last app.use() call"
 }
 
 export interface CodeArchitecture {
   routerStyle: RouterStyle
-  layoutStyle: LayoutStyle           // Next.js specific, 'unknown' for others
+  layoutStyle: LayoutStyle // Next.js specific, 'unknown' for others
   appEntrypoint: AppEntrypoint | null
-  apiDir: string | null              // e.g. "app/api" or "pages/api"
-  providersFile: string | null       // existing providers wrapper if any
-  hasBarrelExports: boolean          // src/index.ts that re-exports things
+  apiDir: string | null // e.g. "app/api" or "pages/api"
+  providersFile: string | null // existing providers wrapper if any
+  hasBarrelExports: boolean // src/index.ts that re-exports things
   importStyle: 'named' | 'default' | 'mixed'
   // precise injection points found by AST analysis
   // keyed by InjectionType — only populated for types the detector could find
@@ -75,7 +75,7 @@ export interface CodeArchitecture {
 export interface ConflictSignals {
   level: ConflictLevel
   existingAuthDetected: boolean
-  signals: string[]                  // human-readable reasons for the conflict level
+  signals: string[] // human-readable reasons for the conflict level
 }
 
 // ============================================================
@@ -102,23 +102,23 @@ export interface DetectedContext {
 // ============================================================
 
 export interface FileToCreate {
-  path: string                       // relative to projectRoot
-  templateKey: string                // which template to render
-  content?: string                   // pre-rendered content if available
+  path: string // relative to projectRoot
+  templateKey: string // which template to render
+  content?: string // pre-rendered content if available
 }
 
 export interface FileToModify {
   path: string
   operation: 'patch' | 'inject'
-  description: string                // human-readable: "add auth middleware import"
-  backupPath?: string                // where to write a backup before modifying
+  description: string // human-readable: "add auth middleware import"
+  backupPath?: string // where to write a backup before modifying
 }
 
 export interface InjectionAction {
   file: string
   type: InjectionType
-  payload: string                    // the actual code string to inject
-  anchor: string                     // the string to insert before/after
+  payload: string // the actual code string to inject
+  anchor: string // the string to insert before/after
   position: 'before' | 'after'
   description: string
 }
@@ -138,10 +138,10 @@ export interface InstallPlan {
   envVarsToAdd: { key: string; description: string; example?: string }[]
   filesToCreate: FileToCreate[]
   filesToModify: FileToModify[]
-  migrationsToCreate: string[]       // migration file names to generate
+  migrationsToCreate: string[] // migration file names to generate
   injectionActions: InjectionAction[]
   conflictActions: ConflictAction[]
-  rollbackHints: string[]            // what to undo if something goes wrong
+  rollbackHints: string[] // what to undo if something goes wrong
 }
 
 // ============================================================
@@ -151,12 +151,12 @@ export interface InstallPlan {
 
 export interface SessionState {
   moduleName: string
-  startedAt: string                  // ISO timestamp
+  startedAt: string // ISO timestamp
   lastUpdatedAt: string
-  currentStep: string                // e.g. "writer:inject-routes"
+  currentStep: string // e.g. "writer:inject-routes"
   completedSteps: string[]
-  selectedOptions: Record<string, unknown>  // user's answers to prompts
-  planSnapshot: InstallPlan          // the plan as it was when session started
+  selectedOptions: Record<string, unknown> // user's answers to prompts
+  planSnapshot: InstallPlan // the plan as it was when session started
   status: SessionStatus
   failureReason?: string
 }
@@ -175,8 +175,8 @@ export interface InstalledModuleState {
   ui: UILevel
   framework: Framework
   orm: ORM
-  stampedFiles: string[]             // files the writer created/modified — never touch without approval
-  pendingUpgrades: string[]          // features available in registry but not installed
+  stampedFiles: string[] // files the writer created/modified — never touch without approval
+  pendingUpgrades: string[] // features available in registry but not installed
 }
 
 // ============================================================
@@ -201,8 +201,8 @@ export interface SedimConfig {
     confirmBeforeWrite: boolean
     dryRunByDefault: boolean
   }
-  overrides: Record<string, unknown>  // escape hatch for edge cases
-  generatedAt: string                 // ISO timestamp + CLI version stamp
+  overrides: Record<string, unknown> // escape hatch for edge cases
+  generatedAt: string // ISO timestamp + CLI version stamp
 }
 
 // ============================================================
@@ -232,7 +232,7 @@ export interface ModuleManifest {
   }
   requires: {
     envVars: string[]
-    peerModules: string[]            // e.g. chat requires auth
+    peerModules: string[] // e.g. chat requires auth
   }
   adapters: {
     frameworks: Framework[]
@@ -255,8 +255,8 @@ export interface TemplateConfig {
 }
 
 export interface InjectionVariant {
-  payload: string              // the code string to inject
-  anchor: string               // what to find in the file to anchor against
+  payload: string // the code string to inject
+  anchor: string // what to find in the file to anchor against
   position: 'before' | 'after'
 }
 
@@ -278,9 +278,9 @@ export interface EnvVarConfig {
 }
 
 export interface PeerContract {
-  module: string               // e.g. 'auth'
-  provides: string[]           // what it provides: ['getCurrentUser', 'getSession']
-  required: boolean            // hard dependency or optional enhancement
+  module: string // e.g. 'auth'
+  provides: string[] // what it provides: ['getCurrentUser', 'getSession']
+  required: boolean // hard dependency or optional enhancement
 }
 
 export interface PlanConfig {

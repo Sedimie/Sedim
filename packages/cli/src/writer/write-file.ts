@@ -1,7 +1,7 @@
 import path from 'node:path'
-import { exists, writeText, readText } from '../shared/fs'
-import { WriteError } from '../shared/errors'
 import type { FileToCreate } from '../planning/types'
+import { WriteError } from '../shared/errors'
+import { exists, readText, writeText } from '../shared/fs'
 
 // creates a new file from a FileToCreate action
 // respects the overwriteStrategy — caller must have already resolved 'ask'
@@ -9,7 +9,7 @@ import type { FileToCreate } from '../planning/types'
 export async function writeFile(
   projectRoot: string,
   file: FileToCreate,
-  overwriteStrategy: 'skip' | 'overwrite' = 'overwrite'
+  overwriteStrategy: 'skip' | 'overwrite' = 'overwrite',
 ): Promise<'created' | 'skipped'> {
   const filePath = path.join(projectRoot, file.path)
   const fileExists = await exists(filePath)
@@ -24,7 +24,7 @@ export async function writeFile(
     throw new WriteError(
       `No content for file "${file.path}" — template was not rendered`,
       undefined,
-      'This is a bug in the module plan-config. Report it.'
+      'This is a bug in the module plan-config. Report it.',
     )
   }
 

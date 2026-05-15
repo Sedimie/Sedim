@@ -2,41 +2,40 @@ import path from 'node:path'
 import fs from 'fs-extra'
 import { DetectionError, WriteError } from './errors'
 
-export async function exists(filePath : string) : Promise<boolean> {
-    return fs.pathExists(filePath);
+export async function exists(filePath: string): Promise<boolean> {
+  return fs.pathExists(filePath)
 }
 
-export async function readText(filePath : string) : Promise<string> { 
-    try {
-        return await fs.readFile(filePath, 'utf-8');
-    }catch(err){
-        throw new WriteError(`Could not read file : ${filePath}`, err);
-    }
+export async function readText(filePath: string): Promise<string> {
+  try {
+    return await fs.readFile(filePath, 'utf-8')
+  } catch (err) {
+    throw new WriteError(`Could not read file : ${filePath}`, err)
+  }
 }
 
-export async function writeText(filePath : string, content : string): Promise<void> {
-    try{
-        return await fs.outputFile(filePath, content);
-    }
-    catch(err){
-        throw new WriteError(`Could not write into file : ${filePath}`, err);
-    }
+export async function writeText(filePath: string, content: string): Promise<void> {
+  try {
+    return await fs.outputFile(filePath, content)
+  } catch (err) {
+    throw new WriteError(`Could not write into file : ${filePath}`, err)
+  }
 }
 
-export async function readJSON<T>(filePath : string): Promise<T>{
-    try{
-        return await fs.readJSON(filePath);
-    }catch(err){
-        throw new WriteError(`Couldn't read JSON from ${filePath}`, err);
-    }
+export async function readJSON<T>(filePath: string): Promise<T> {
+  try {
+    return await fs.readJSON(filePath)
+  } catch (err) {
+    throw new WriteError(`Couldn't read JSON from ${filePath}`, err)
+  }
 }
 
-export async function writeJSON(filePath : string, data : unknown) : Promise<void>{
-    try{
-        fs.outputJSON(filePath, data, {spaces : 2});
-    }catch(err){
-        throw new WriteError(`Couldn't write JSON in ${filePath}`, err);
-    }
+export async function writeJSON(filePath: string, data: unknown): Promise<void> {
+  try {
+    await fs.outputJSON(filePath, data, { spaces: 2 })
+  } catch (err) {
+    throw new WriteError(`Couldn't write JSON in ${filePath}`, err)
+  }
 }
 
 // CAVEAT: if the user runs this from a monorepo workspace root, we throw with
@@ -61,7 +60,7 @@ export async function findProjectRoot(from?: string): Promise<string> {
       throw new DetectionError(
         `Could not find project root. Run this command from inside your app directory.`,
         undefined,
-        `Try running from your app's root directory, not the monorepo root.`
+        `Try running from your app's root directory, not the monorepo root.`,
       )
     }
     current = parent

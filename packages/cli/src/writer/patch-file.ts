@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { exists, readText, writeText } from '../shared/fs'
 import { WriteError } from '../shared/errors'
+import { exists, readText, writeText } from '../shared/fs'
 
 // writes a backup of a file before modifying it
 // backup lives at <file>.sedim.bak — user can restore manually if needed
@@ -25,7 +25,7 @@ export async function patchFile(
   filePath: string,
   find: string,
   replace: string,
-  backup = true
+  backup = true,
 ): Promise<void> {
   const absPath = path.join(projectRoot, filePath)
 
@@ -33,7 +33,7 @@ export async function patchFile(
     throw new WriteError(
       `Cannot patch "${filePath}" — file does not exist`,
       undefined,
-      'Check that the file path in the plan is correct.'
+      'Check that the file path in the plan is correct.',
     )
   }
 
@@ -45,7 +45,7 @@ export async function patchFile(
       throw new WriteError(
         `Patch anchor not found in "${filePath}"`,
         undefined,
-        `Expected to find: ${find.slice(0, 80)}...`
+        `Expected to find: ${find.slice(0, 80)}...`,
       )
     }
     await writeText(absPath, content.replace(find, replace))

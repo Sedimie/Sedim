@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { exists } from '../shared/fs'
 import type { ProjectStructure } from '../planning/types'
+import { exists } from '../shared/fs'
 
 export async function detectStructure(projectRoot: string): Promise<ProjectStructure> {
   const srcDir = await resolveSrcDir(projectRoot)
@@ -18,14 +18,17 @@ async function resolveSrcDir(projectRoot: string): Promise<string | null> {
   return null
 }
 
-async function resolveRouteEntrypoints(projectRoot: string, srcDir: string | null): Promise<string[]> {
+async function resolveRouteEntrypoints(
+  projectRoot: string,
+  srcDir: string | null,
+): Promise<string[]> {
   const candidates = [
-    'src/app',          // Next.js app router with src/
-    'app',              // Next.js app router without src/
-    'src/pages',        // Next.js pages router with src/
-    'pages',            // Next.js pages router without src/
-    'src/routes',       // SvelteKit / custom Express route dirs
-    'src/api',          // standalone API dirs
+    'src/app', // Next.js app router with src/
+    'app', // Next.js app router without src/
+    'src/pages', // Next.js pages router with src/
+    'pages', // Next.js pages router without src/
+    'src/routes', // SvelteKit / custom Express route dirs
+    'src/api', // standalone API dirs
   ]
 
   const found: string[] = []
@@ -37,13 +40,16 @@ async function resolveRouteEntrypoints(projectRoot: string, srcDir: string | nul
   return found
 }
 
-async function resolveMiddlewareCandidates(projectRoot: string, srcDir: string | null): Promise<string[]> {
+async function resolveMiddlewareCandidates(
+  projectRoot: string,
+  srcDir: string | null,
+): Promise<string[]> {
   const candidates = [
     'src/middleware.ts',
     'src/middleware.js',
-    'middleware.ts',          // Next.js middleware at root
+    'middleware.ts', // Next.js middleware at root
     'middleware.js',
-    'src/app.ts',             // Express app entry
+    'src/app.ts', // Express app entry
     'src/app.js',
     'src/server.ts',
     'src/server.js',

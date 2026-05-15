@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { Project, SyntaxKind } from 'ts-morph'
-import { exists, readJSON } from '../shared/fs'
 import type { Detected, Framework } from '../planning/types'
+import { exists, readJSON } from '../shared/fs'
 
 type PkgJSON = {
   dependencies?: Record<string, string>
@@ -28,7 +28,9 @@ export async function detectFramework(projectRoot: string): Promise<Detected<Fra
       try {
         const pkg = await readJSON<PkgJSON>(path.join(projectRoot, 'package.json'))
         if (hasDep(pkg, 'next')) evidence.push('"next" in dependencies')
-      } catch { /* no package.json */ }
+      } catch {
+        /* no package.json */
+      }
       return { value: framework, confidence: 'high', evidence }
     }
   }
@@ -64,7 +66,9 @@ export async function detectFramework(projectRoot: string): Promise<Detected<Fra
         return { value: 'nextjs', confidence: 'medium', evidence }
       }
     }
-  } catch { /* no package.json */ }
+  } catch {
+    /* no package.json */
+  }
 
   // AST pass — for Express/Hono/Fastify which have no config files
   // scan likely entry files for framework instantiation calls
@@ -93,12 +97,32 @@ export async function detectFramework(projectRoot: string): Promise<Detected<Fra
 // returns a description string if found, null if not
 async function detectFrameworkFromAST(
   projectRoot: string,
-  framework: Framework
+  framework: Framework,
 ): Promise<string | null> {
   const patterns: Record<string, { call: string; files: string[] }> = {
-    express:  { call: 'express',  files: ['src/app.ts', 'src/app.js', 'src/server.ts', 'src/server.js', 'src/index.ts', 'src/index.js'] },
-    hono:     { call: 'Hono',     files: ['src/app.ts', 'src/app.js', 'src/index.ts', 'src/index.js'] },
-    fastify:  { call: 'fastify',  files: ['src/app.ts', 'src/app.js', 'src/server.ts', 'src/server.js', 'src/index.ts', 'src/index.js'] },
+    express: {
+      call: 'express',
+      files: [
+        'src/app.ts',
+        'src/app.js',
+        'src/server.ts',
+        'src/server.js',
+        'src/index.ts',
+        'src/index.js',
+      ],
+    },
+    hono: { call: 'Hono', files: ['src/app.ts', 'src/app.js', 'src/index.ts', 'src/index.js'] },
+    fastify: {
+      call: 'fastify',
+      files: [
+        'src/app.ts',
+        'src/app.js',
+        'src/server.ts',
+        'src/server.js',
+        'src/index.ts',
+        'src/index.js',
+      ],
+    },
   }
 
   const pattern = patterns[framework]
@@ -132,7 +156,9 @@ async function detectFrameworkFromAST(
           .some(c => c.getExpression().getText() === pattern.call)
         if (found) return `found "${pattern.call}()" call in ${file}`
       }
-    } catch { /* unreadable or not valid TS/JS */ }
+    } catch {
+      /* unreadable or not valid TS/JS */
+    }
   }
 
   return null
@@ -141,7 +167,7 @@ async function detectFrameworkFromAST(
 // tries all non-Next.js frameworks via AST when no deps were found
 async function detectAnyFrameworkFromAST(
   projectRoot: string,
-  evidence: string[]
+  evidence: string[],
 ): Promise<Framework | null> {
   const frameworks: Framework[] = ['express', 'hono', 'fastify']
   for (const fw of frameworks) {

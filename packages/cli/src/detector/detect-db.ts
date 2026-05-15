@@ -1,6 +1,6 @@
 import path from 'node:path'
+import type { DBType, Detected } from '../planning/types'
 import { exists, readJSON, readText } from '../shared/fs'
-import type { Detected, DBType } from '../planning/types'
 
 type PkgJSON = {
   dependencies?: Record<string, string>
@@ -27,7 +27,13 @@ export async function detectDB(projectRoot: string): Promise<Detected<DBType>> {
   try {
     const pkg = await readJSON<PkgJSON>(path.join(projectRoot, 'package.json'))
 
-    const postgresDrivers = ['pg', 'postgres', '@neondatabase/serverless', '@vercel/postgres', 'pg-native']
+    const postgresDrivers = [
+      'pg',
+      'postgres',
+      '@neondatabase/serverless',
+      '@vercel/postgres',
+      'pg-native',
+    ]
     const mysqlDrivers = ['mysql2', '@planetscale/database']
     const sqliteDrivers = ['better-sqlite3', '@libsql/client', 'bun:sqlite']
     const mongoDrivers = ['mongodb', 'mongoose']
@@ -56,7 +62,9 @@ export async function detectDB(projectRoot: string): Promise<Detected<DBType>> {
         return { value: 'mongodb', confidence: 'high', evidence }
       }
     }
-  } catch { /* no package.json */ }
+  } catch {
+    /* no package.json */
+  }
 
   // drizzle.config.ts dialect field — read as text, regex is enough
   const drizzleConfigs = ['drizzle.config.ts', 'drizzle.config.js']
@@ -65,7 +73,10 @@ export async function detectDB(projectRoot: string): Promise<Detected<DBType>> {
     if (await exists(filePath)) {
       try {
         const content = await readText(filePath)
-        if (content.includes("dialect: 'postgresql'") || content.includes('dialect: "postgresql"')) {
+        if (
+          content.includes("dialect: 'postgresql'") ||
+          content.includes('dialect: "postgresql"')
+        ) {
           evidence.push(`dialect: postgresql in ${file}`)
           return { value: 'postgres', confidence: 'high', evidence }
         }
@@ -77,7 +88,9 @@ export async function detectDB(projectRoot: string): Promise<Detected<DBType>> {
           evidence.push(`dialect: sqlite in ${file}`)
           return { value: 'sqlite', confidence: 'high', evidence }
         }
-      } catch { /* unreadable */ }
+      } catch {
+        /* unreadable */
+      }
     }
   }
 
@@ -96,7 +109,9 @@ export async function detectDB(projectRoot: string): Promise<Detected<DBType>> {
             return { value: dbType, confidence: 'medium', evidence }
           }
         }
-      } catch { /* unreadable */ }
+      } catch {
+        /* unreadable */
+      }
     }
   }
 

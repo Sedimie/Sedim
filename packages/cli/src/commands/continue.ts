@@ -1,10 +1,11 @@
-import * as ui from '../showbaby/index'
 import { detect } from '../detector/index'
-import { readSession, clearSession } from '../session/index'
-import { applyPlan } from '../writer/index'
+import type { DetectedContext } from '../planning/types'
+import { clearSession, readSession } from '../session/index'
 import { findProjectRoot } from '../shared/fs'
-import { logger } from '../telemetry/logger'
+import * as ui from '../showbaby/index'
 import { writeAuditEntry } from '../telemetry/audit-log'
+import { logger } from '../telemetry/logger'
+import { applyPlan } from '../writer/index'
 
 export async function runContinue(moduleName?: string): Promise<void> {
   ui.showIntro('continue')
@@ -36,7 +37,7 @@ export async function runContinue(moduleName?: string): Promise<void> {
   ui.logInfo(`Resuming "${session.moduleName}" from step: ${session.currentStep}`)
   ui.logNote(
     `Started: ${session.startedAt}\nLast updated: ${session.lastUpdatedAt}\nCompleted steps: ${session.completedSteps.join(', ') || 'none'}`,
-    'Session'
+    'Session',
   )
 
   // ── drift detection ──────────────────────────────────────
@@ -44,7 +45,7 @@ export async function runContinue(moduleName?: string): Promise<void> {
   ui.logSection('Drift Check')
   const spinner = ui.spinDetecting()
 
-  let ctx
+  let ctx: DetectedContext
   try {
     ctx = await detect(projectRoot)
     spinner.stop('Project state checked')

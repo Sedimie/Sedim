@@ -1,10 +1,10 @@
 import type { InstallPlan } from '../planning/types'
-import { writeFile } from './write-file'
-import { injectImport } from './inject-imports'
-import { injectCode } from './inject-code'
-import { updateEnv } from './update-env'
-import { installDependencies } from '../shared/package-manager'
 import { WriteError } from '../shared/errors'
+import { installDependencies } from '../shared/package-manager'
+import { injectCode } from './inject-code'
+import { injectImport } from './inject-imports'
+import { updateEnv } from './update-env'
+import { writeFile } from './write-file'
 
 // executes an approved InstallPlan against the filesystem
 // order matters:
@@ -13,10 +13,7 @@ import { WriteError } from '../shared/errors'
 //   3. inject imports — before injecting code that uses those imports
 //   4. inject code — routes, middleware, provider wraps
 //   5. env vars last — additive only, never destructive
-export async function applyPlan(
-  projectRoot: string,
-  plan: InstallPlan
-): Promise<void> {
+export async function applyPlan(projectRoot: string, plan: InstallPlan): Promise<void> {
   // ── 1. install dependencies ──────────────────────────────
   if (plan.dependenciesToInstall.length > 0) {
     try {

@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { exists, readJSON } from '../shared/fs'
 import type { Detected, ORM } from '../planning/types'
+import { exists, readJSON } from '../shared/fs'
 
 type PkgJSON = {
   dependencies?: Record<string, string>
@@ -56,7 +56,9 @@ export async function detectORM(projectRoot: string): Promise<Detected<ORM>> {
     // no ORM deps at all — this is a valid state
     evidence.push('no ORM deps found')
     return { value: 'none', confidence: 'high', evidence }
-  } catch { /* no package.json */ }
+  } catch {
+    /* no package.json */
+  }
 
   evidence.push('could not read package.json')
   return { value: 'unknown', confidence: 'low', evidence }

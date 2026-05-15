@@ -33,16 +33,19 @@ export function showError(err: unknown): void {
 export function showDoctorReport(checks: DoctorCheck[]): void {
   const lines = checks.map(check => {
     const icon =
-      check.status === 'pass' ? chalk.green('✓') :
-      check.status === 'warn' ? chalk.yellow('⚠') :
-      chalk.red('✗')
+      check.status === 'pass'
+        ? chalk.green('✓')
+        : check.status === 'warn'
+          ? chalk.yellow('⚠')
+          : chalk.red('✗')
 
     const name = chalk.bold(check.name.padEnd(24))
-    const msg = check.status === 'fail'
-      ? chalk.red(check.message)
-      : check.status === 'warn'
-      ? chalk.yellow(check.message)
-      : chalk.dim(check.message)
+    const msg =
+      check.status === 'fail'
+        ? chalk.red(check.message)
+        : check.status === 'warn'
+          ? chalk.yellow(check.message)
+          : chalk.dim(check.message)
 
     const fix = check.fix ? `\n    ${chalk.dim('fix:')} ${chalk.cyan(check.fix)}` : ''
 

@@ -1,11 +1,12 @@
-import * as ui from '../showbaby/index'
-import { detect } from '../detector/index'
-import { isSedimInitialised } from '../config/index'
-import { loadModuleManifest } from '../thinker/load-module-manifest'
-import { buildPlan } from '../thinker/index'
-import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
-import { findProjectRoot, exists, readText } from '../shared/fs'
 import path from 'node:path'
+import { isSedimInitialised } from '../config/index'
+import { detect } from '../detector/index'
+import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
+import { exists, findProjectRoot, readText } from '../shared/fs'
+import * as ui from '../showbaby/index'
+import { buildPlan } from '../thinker/index'
+import { loadModuleManifest } from '../thinker/load-module-manifest'
+import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
 
 export async function runDiff(moduleName: string): Promise<void> {
   ui.showIntro(`diff ${moduleName}`)
@@ -17,46 +18,54 @@ export async function runDiff(moduleName: string): Promise<void> {
     process.exit(1)
   }
 
+  let ctx: DetectedContext
   const spinner = ui.spinDetecting()
-  const ctx = await detect(projectRoot).catch(err => {
+  try {
+    ctx = await detect(projectRoot)
+    spinner.stop('Stack detected')
+  } catch (err) {
     spinner.fail('Detection failed')
     ui.showError(err)
     process.exit(1)
-  })
-  spinner.stop('Stack detected')
+  }
 
-  const manifest = await loadModuleManifest(moduleName).catch(err => {
+  let manifest: ModuleManifest
+  try {
+    manifest = await loadModuleManifest(moduleName)
+  } catch (err) {
     ui.showError(err)
     process.exit(1)
-  })
+  }
 
-  const planConfig = manifestToPlanConfig(manifest, [], ctx)
-  const plan = await buildPlan(ctx, planConfig, []).catch(err => {
+  let plan: InstallPlan
+  try {
+    const planConfig = manifestToPlanConfig(manifest, [], ctx)
+    plan = await buildPlan(ctx, planConfig, [])
+  } catch (err) {
     ui.showError(err)
     process.exit(1)
-  })
+  }
 
   ui.logSection('File Diffs')
 
-  // for files to modify — show before/after diff
   for (const file of plan.filesToModify) {
     const filePath = path.join(projectRoot, file.path)
     if (await exists(filePath)) {
       const before = await readText(filePath)
-      // after content comes from the plan's injection actions for this file
       const injections = plan.injectionActions.filter(a => a.file === file.path)
       let after = before
       for (const injection of injections) {
-        after = after.replace(injection.anchor, injection.position === 'after'
-          ? `${injection.anchor}\n${injection.payload}`
-          : `${injection.payload}\n${injection.anchor}`
+        after = after.replace(
+          injection.anchor,
+          injection.position === 'after'
+            ? `${injection.anchor}\n${injection.payload}`
+            : `${injection.payload}\n${injection.anchor}`,
         )
       }
       ui.showDiff(file.path, before, after)
     }
   }
 
-  // for files to create — show the full content as additions
   for (const file of plan.filesToCreate) {
     if (file.content) {
       ui.showDiff(file.path, '', file.content)

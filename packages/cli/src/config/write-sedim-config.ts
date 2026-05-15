@@ -1,11 +1,14 @@
 import path from 'node:path'
-import { writeText, writeJSON } from '../shared/fs'
-import { SEDIM_CONFIG_FILE, SEDIM_CONFIG_CACHE, CLI_VERSION } from '../shared/constants'
+import type { DetectedContext, SedimConfig } from '../planning/types'
+import { CLI_VERSION, SEDIM_CONFIG_CACHE, SEDIM_CONFIG_FILE } from '../shared/constants'
 import { WriteError } from '../shared/errors'
-import type { SedimConfig, DetectedContext } from '../planning/types'
+import { writeJSON, writeText } from '../shared/fs'
 
 // builds a SedimConfig from detected context + user choices
-export function buildConfig(ctx: DetectedContext, overrides: Partial<SedimConfig> = {}): SedimConfig {
+export function buildConfig(
+  ctx: DetectedContext,
+  overrides: Partial<SedimConfig> = {},
+): SedimConfig {
   return {
     framework: ctx.framework.value,
     orm: ctx.orm.value,

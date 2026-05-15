@@ -12,7 +12,7 @@ export function validateSedimConfig(config: unknown): asserts config is SedimCon
     throw new DetectionError(
       'sedim.config.ts is invalid — expected an object',
       undefined,
-      'Run `sedim init` to regenerate the config.'
+      'Run `sedim init` to regenerate the config.',
     )
   }
 

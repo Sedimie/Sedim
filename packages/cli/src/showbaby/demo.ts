@@ -1,10 +1,10 @@
 // demo runner — shows the full showbaby UX flow
 // run with: pnpm --filter @sedim/cli exec tsx src/showbaby/demo.ts
 
-import * as ui from './index'
-import { detect } from '../detector/index'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { detect } from '../detector/index'
+import * as ui from './index'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const playgroundPath = path.resolve(__dirname, '../../../../apps/playground')
@@ -31,14 +31,14 @@ async function main() {
   const ui_level = await ui.select('UI style for components?', [
     { value: 'headless', label: 'Headless', hint: 'unstyled, full control' },
     { value: 'tailwind', label: 'Tailwind', hint: 'pre-styled with tailwind' },
-    { value: 'themed',   label: 'Themed',   hint: 'pre-built theme variants' },
+    { value: 'themed', label: 'Themed', hint: 'pre-built theme variants' },
   ])
 
   const features = await ui.multiselect('Which auth providers?', [
     { value: 'email-password', label: 'Email + Password' },
-    { value: 'magic-link',     label: 'Magic Link' },
-    { value: 'oauth-google',   label: 'Google OAuth' },
-    { value: 'oauth-github',   label: 'GitHub OAuth' },
+    { value: 'magic-link', label: 'Magic Link' },
+    { value: 'oauth-google', label: 'Google OAuth' },
+    { value: 'oauth-github', label: 'GitHub OAuth' },
   ])
 
   // ── tasks ─────────────────────────────────────────────────
@@ -68,16 +68,24 @@ async function main() {
     dependenciesToInstall: ['better-auth'],
     devDependenciesToInstall: [],
     envVarsToAdd: [
-      { key: 'AUTH_SECRET',    description: 'random secret for signing sessions', example: 'openssl rand -hex 32' },
-      { key: 'DATABASE_URL',   description: 'postgres connection string' },
+      {
+        key: 'AUTH_SECRET',
+        description: 'random secret for signing sessions',
+        example: 'openssl rand -hex 32',
+      },
+      { key: 'DATABASE_URL', description: 'postgres connection string' },
     ],
     filesToCreate: [
-      { path: 'src/lib/auth.ts',              templateKey: 'auth-config' },
+      { path: 'src/lib/auth.ts', templateKey: 'auth-config' },
       { path: 'src/app/api/auth/[...all]/route.ts', templateKey: 'auth-route' },
-      { path: 'src/db/schema/auth.ts',        templateKey: 'auth-schema' },
+      { path: 'src/db/schema/auth.ts', templateKey: 'auth-schema' },
     ],
     filesToModify: [
-      { path: 'src/app/layout.tsx', operation: 'inject' as const, description: 'wrap with SessionProvider' },
+      {
+        path: 'src/app/layout.tsx',
+        operation: 'inject' as const,
+        description: 'wrap with SessionProvider',
+      },
     ],
     migrationsToCreate: ['0001_add_auth_tables'],
     injectionActions: [],
@@ -103,10 +111,20 @@ async function main() {
   // ── doctor demo ───────────────────────────────────────────
   ui.logSection('Doctor Report Demo')
   ui.showDoctorReport([
-    { name: 'Node version',   status: 'pass', message: 'v22.18.0 (>=18 required)' },
-    { name: 'sedim.config.ts',status: 'pass', message: 'found at project root' },
-    { name: 'DATABASE_URL',   status: 'warn', message: 'not set in .env', fix: 'add DATABASE_URL to your .env file' },
-    { name: 'AUTH_SECRET',    status: 'fail', message: 'missing — auth will not work', fix: 'run: openssl rand -hex 32' },
+    { name: 'Node version', status: 'pass', message: 'v22.18.0 (>=18 required)' },
+    { name: 'sedim.config.ts', status: 'pass', message: 'found at project root' },
+    {
+      name: 'DATABASE_URL',
+      status: 'warn',
+      message: 'not set in .env',
+      fix: 'add DATABASE_URL to your .env file',
+    },
+    {
+      name: 'AUTH_SECRET',
+      status: 'fail',
+      message: 'missing — auth will not work',
+      fix: 'run: openssl rand -hex 32',
+    },
   ])
 
   ui.showOutro(`Done. Selected: ${ui_level} UI, providers: ${features.join(', ')}`)

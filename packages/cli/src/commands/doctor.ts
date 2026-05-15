@@ -1,11 +1,11 @@
-import * as ui from '../showbaby/index'
-import { detect } from '../detector/index'
-import { isSedimInitialised } from '../config/index'
-import { readSession } from '../session/index'
-import { findProjectRoot, exists } from '../shared/fs'
-import { MIN_NODE_VERSION } from '../shared/constants'
 import path from 'node:path'
+import { isSedimInitialised } from '../config/index'
+import { detect } from '../detector/index'
+import { readSession } from '../session/index'
+import { MIN_NODE_VERSION } from '../shared/constants'
+import { exists, findProjectRoot } from '../shared/fs'
 import type { DoctorCheck } from '../showbaby/index'
+import * as ui from '../showbaby/index'
 
 export async function runDoctor(): Promise<void> {
   ui.showIntro('doctor')
@@ -54,7 +54,8 @@ export async function runDoctor(): Promise<void> {
       name: 'Framework',
       status: ctx.framework.value === 'unknown' ? 'warn' : 'pass',
       message: `${ctx.framework.value} (${ctx.framework.confidence} confidence)`,
-      fix: ctx.framework.value === 'unknown' ? 'Set framework manually in sedim.config.ts' : undefined,
+      fix:
+        ctx.framework.value === 'unknown' ? 'Set framework manually in sedim.config.ts' : undefined,
     })
 
     checks.push({
@@ -70,15 +71,15 @@ export async function runDoctor(): Promise<void> {
     })
 
     // ── env vars ───────────────────────────────────────────
-    const envExists = await exists(path.join(projectRoot, '.env')) ||
-                      await exists(path.join(projectRoot, '.env.local'))
+    const envExists =
+      (await exists(path.join(projectRoot, '.env'))) ||
+      (await exists(path.join(projectRoot, '.env.local')))
     checks.push({
       name: '.env file',
       status: envExists ? 'pass' : 'warn',
       message: envExists ? 'found' : 'no .env or .env.local found',
       fix: envExists ? undefined : 'Create a .env file at your project root',
     })
-
   } catch (err) {
     spinner.fail('Detection failed')
     checks.push({
@@ -95,7 +96,9 @@ export async function runDoctor(): Promise<void> {
   const warned = checks.filter(c => c.status === 'warn').length
 
   if (failed > 0) {
-    ui.showOutro(`${failed} issue${failed !== 1 ? 's' : ''} found — fix them before running sedim add.`)
+    ui.showOutro(
+      `${failed} issue${failed !== 1 ? 's' : ''} found — fix them before running sedim add.`,
+    )
   } else if (warned > 0) {
     ui.showOutro(`${warned} warning${warned !== 1 ? 's' : ''} — things will work but review them.`)
   } else {

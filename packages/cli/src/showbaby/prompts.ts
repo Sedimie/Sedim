@@ -23,7 +23,7 @@ export async function confirm(message: string, initialValue = false): Promise<bo
 
 export async function select<T extends string>(
   message: string,
-  options: Array<{ value: T; label: string; hint?: string }>
+  options: Array<{ value: T; label: string; hint?: string }>,
 ): Promise<T> {
   const result = await clack.select({ message, options })
   handleCancel(result)
@@ -33,7 +33,7 @@ export async function select<T extends string>(
 export async function multiselect<T extends string>(
   message: string,
   options: Array<{ value: T; label: string; hint?: string }>,
-  required = true
+  required = true,
 ): Promise<T[]> {
   const result = await clack.multiselect({ message, options, required })
   handleCancel(result)
@@ -43,7 +43,7 @@ export async function multiselect<T extends string>(
 export async function text(
   message: string,
   placeholder?: string,
-  validate?: (value: string | undefined) => string | Error | undefined
+  validate?: (value: string | undefined) => string | Error | undefined,
 ): Promise<string> {
   const result = await clack.text({ message, placeholder, validate })
   handleCancel(result)

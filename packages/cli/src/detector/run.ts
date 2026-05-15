@@ -2,9 +2,9 @@
 // usage: npx tsx src/detector/run.ts <path-to-project>
 // example: npx tsx src/detector/run.ts ../../../apps/playground
 
-import { detect } from './index'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { detect } from './index'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

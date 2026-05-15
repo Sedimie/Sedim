@@ -1,18 +1,19 @@
-import * as ui from '../showbaby/index'
+import { isSedimInitialised, readSedimConfig } from '../config/index'
 import { detect } from '../detector/index'
-import { readSedimConfig, isSedimInitialised } from '../config/index'
+import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { readSession, writeSession } from '../session/index'
-import { loadModuleManifest } from '../thinker/load-module-manifest'
+import { findProjectRoot } from '../shared/fs'
+import * as ui from '../showbaby/index'
+import { writeAuditEntry } from '../telemetry/audit-log'
+import { logger } from '../telemetry/logger'
 import { buildPlan } from '../thinker/index'
+import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
 import { applyPlan } from '../writer/index'
-import { findProjectRoot } from '../shared/fs'
-import { logger } from '../telemetry/logger'
-import { writeAuditEntry } from '../telemetry/audit-log'
 
 export async function runAdd(
   moduleName: string,
-  options: { dryRun?: boolean; force?: boolean } = {}
+  options: { dryRun?: boolean; force?: boolean } = {},
 ): Promise<void> {
   ui.showIntro(`add ${moduleName}`)
   const start = Date.now()
@@ -31,7 +32,7 @@ export async function runAdd(
   if (existingSession?.moduleName === moduleName && existingSession.status === 'active') {
     const resume = await ui.confirm(
       `Found an interrupted session for "${moduleName}". Resume it?`,
-      true
+      true,
     )
     if (resume) {
       ui.logInfo('Resuming session — run `sedim continue` for full resume flow.')
@@ -42,7 +43,7 @@ export async function runAdd(
   ui.logSection('Detection')
   const spinner = ui.spinDetecting()
 
-  let ctx
+  let ctx: DetectedContext
   try {
     ctx = await detect(projectRoot)
     spinner.stop('Stack detected')
@@ -58,7 +59,7 @@ export async function runAdd(
   ui.logSection('Module')
   const manifestSpinner = ui.createSpinner(`Fetching ${moduleName} manifest...`)
 
-  let manifest
+  let manifest: ModuleManifest
   try {
     manifest = await loadModuleManifest(moduleName)
     manifestSpinner.stop(`${moduleName} manifest loaded`)
@@ -76,21 +77,21 @@ export async function runAdd(
   if (manifest.features.providers?.length) {
     selections.providers = await ui.multiselect(
       'Which providers?',
-      manifest.features.providers.map(p => ({ value: p, label: p }))
+      manifest.features.providers.map(p => ({ value: p, label: p })),
     )
   }
 
   if (manifest.features.ui?.length) {
     selections.ui = await ui.select(
       'UI style?',
-      manifest.features.ui.map(u => ({ value: u, label: u }))
+      manifest.features.ui.map(u => ({ value: u, label: u })),
     )
   }
 
   if (manifest.features.authorization?.length) {
     selections.authorization = await ui.select(
       'Authorization model?',
-      manifest.features.authorization.map(a => ({ value: a, label: a }))
+      manifest.features.authorization.map(a => ({ value: a, label: a })),
     )
   }
 
@@ -108,7 +109,7 @@ export async function runAdd(
   // convert manifest to PlanConfig — real modules will provide their own
   const planConfig = manifestToPlanConfig(manifest, selectedFeatures, ctx)
 
-  let plan
+  let plan: InstallPlan
   try {
     plan = await buildPlan(ctx, planConfig, selectedFeatures)
     planSpinner.stop('Plan ready')
@@ -129,9 +130,7 @@ export async function runAdd(
   // ── resolve pending conflicts before writing ─────────────
   // any conflict still marked pending-user-choice must be resolved
   // before the writer runs — writer only executes, never decides
-  const pendingConflicts = plan.conflictActions.filter(
-    c => c.resolution === 'pending-user-choice'
-  )
+  const pendingConflicts = plan.conflictActions.filter(c => c.resolution === 'pending-user-choice')
 
   if (pendingConflicts.length > 0 && !options.force) {
     ui.logSection('Conflicts')
@@ -147,9 +146,9 @@ export async function runAdd(
       const resolution = await ui.select<'skip' | 'overwrite'>(
         `How to handle "${conflict.file}"?`,
         [
-          { value: 'skip',      label: 'Skip',      hint: 'leave the existing file untouched' },
-          { value: 'overwrite', label: 'Overwrite',  hint: 'replace with the new version' },
-        ]
+          { value: 'skip', label: 'Skip', hint: 'leave the existing file untouched' },
+          { value: 'overwrite', label: 'Overwrite', hint: 'replace with the new version' },
+        ],
       )
       conflict.resolution = resolution
     }
@@ -180,7 +179,12 @@ export async function runAdd(
     await applyPlan(projectRoot, plan)
   } catch (err) {
     ui.showError(err)
-    await writeAuditEntry(projectRoot, { command: 'add', module: moduleName, status: 'failed', error: String(err) })
+    await writeAuditEntry(projectRoot, {
+      command: 'add',
+      module: moduleName,
+      status: 'failed',
+      error: String(err),
+    })
     ui.logWarn('Session preserved — run `sedim continue` to retry.')
     process.exit(1)
   }

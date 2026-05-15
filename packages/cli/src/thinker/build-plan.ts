@@ -1,14 +1,14 @@
 import type {
   DetectedContext,
-  PlanConfig,
-  InstallPlan,
   FileToCreate,
   FileToModify,
   InjectionAction,
   InjectionType,
+  InstallPlan,
+  PlanConfig,
 } from '../planning/types'
-import { classifyConflicts } from './classify-conflicts'
 import { PlanError } from '../shared/errors'
+import { classifyConflicts } from './classify-conflicts'
 
 // minimum manifest version the thinker can process
 // bump this when PlanConfig or InstallPlan shapes change in a breaking way
@@ -23,7 +23,7 @@ function validateManifestVersion(version: string): void {
     throw new PlanError(
       `Invalid manifest version format: "${version}"`,
       undefined,
-      'The module manifest version must follow semver (e.g. 0.1.0).'
+      'The module manifest version must follow semver (e.g. 0.1.0).',
     )
   }
   const [maj, min] = parts.map(Number)
@@ -31,7 +31,7 @@ function validateManifestVersion(version: string): void {
     throw new PlanError(
       `Manifest version "${version}" is not compatible with this CLI (requires >=${MIN_MANIFEST_VERSION})`,
       undefined,
-      'Update sedim to the latest version or check the module registry for a compatible manifest.'
+      'Update sedim to the latest version or check the module registry for a compatible manifest.',
     )
   }
 }
@@ -45,7 +45,7 @@ function validateManifestVersion(version: string): void {
 export async function buildPlan(
   ctx: DetectedContext,
   config: PlanConfig,
-  selectedFeatures: string[]
+  selectedFeatures: string[],
 ): Promise<InstallPlan> {
   // validate manifest version before doing anything
   validateManifestVersion(config.version)
@@ -79,14 +79,18 @@ export async function buildPlan(
     // 2. framework-specific variant from the module's PlanConfig
     // 3. fallback variant from the module's PlanConfig
     // 4. null → can't inject safely, add as conflict for user to resolve
-    const resolvedVariant = resolveVariant(ctx, injection.type, framework, injection.variants, injection.fallback)
+    const resolvedVariant = resolveVariant(
+      ctx,
+      injection.type,
+      framework,
+      injection.variants,
+      injection.fallback,
+    )
 
     if (!resolvedVariant) {
       // no anchor found anywhere — we cannot inject safely
       // record this as something the user needs to handle manually
-      unresolvableInjections.push(
-        `${injection.type} into ${targetFile} — no injection point found`
-      )
+      unresolvableInjections.push(`${injection.type} into ${targetFile} — no injection point found`)
       continue
     }
 
@@ -115,7 +119,7 @@ export async function buildPlan(
     ctx.projectRoot,
     ctx,
     filePathsToCreate,
-    config.schemaTables
+    config.schemaTables,
   )
 
   // full conflict = bail unless force flag is set
@@ -124,7 +128,7 @@ export async function buildPlan(
     conflictActions.push({
       file: 'project',
       level: 'full',
-      description: 'Existing auth implementation detected. Full conflict — manual review required.',
+      description: `Existing ${config.moduleName} implementation detected. Full conflict — manual review required.`,
       resolution: 'pending-user-choice',
     })
   }
@@ -162,9 +166,8 @@ export async function buildPlan(
     envVarsToAdd,
     filesToCreate,
     filesToModify,
-    migrationsToCreate: config.schemaTables.length > 0
-      ? [`${Date.now()}_add_${config.moduleName}_tables`]
-      : [],
+    migrationsToCreate:
+      config.schemaTables.length > 0 ? [`${Date.now()}_add_${config.moduleName}_tables`] : [],
     injectionActions,
     conflictActions,
     rollbackHints,
@@ -186,7 +189,7 @@ function resolveVariant(
   injectionType: InjectionType,
   framework: DetectedContext['framework']['value'],
   variants: PlanConfig['injections'][number]['variants'],
-  fallback: PlanConfig['injections'][number]['fallback']
+  fallback: PlanConfig['injections'][number]['fallback'],
 ): ResolvedVariant | null {
   // priority 1 — AST-found anchor from detect-code-architecture
   // most precise because it was found by actually reading the code
@@ -198,7 +201,7 @@ function resolveVariant(
     if (variant) {
       return {
         payload: variant.payload,
-        anchor: astAnchor.anchorText,   // use AST anchor, not variant anchor
+        anchor: astAnchor.anchorText, // use AST anchor, not variant anchor
         position: astAnchor.position,
       }
     }

@@ -1,4 +1,4 @@
-import type { ModuleManifest, PlanConfig, DetectedContext } from '../planning/types'
+import type { DetectedContext, ModuleManifest, PlanConfig } from '../planning/types'
 
 // converts a ModuleManifest (from registry) into a PlanConfig (for the thinker)
 // this is a generic best-effort conversion used until a module ships
@@ -11,7 +11,7 @@ import type { ModuleManifest, PlanConfig, DetectedContext } from '../planning/ty
 export function manifestToPlanConfig(
   manifest: ModuleManifest,
   selectedFeatures: string[],
-  _ctx: DetectedContext
+  _ctx: DetectedContext,
 ): PlanConfig {
   return {
     moduleName: manifest.name,

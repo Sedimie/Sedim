@@ -1,8 +1,8 @@
 import path from 'node:path'
-import { exists, readJSON } from '../shared/fs'
+import type { SessionState } from '../planning/types'
 import { SEDIM_SESSION_FILE } from '../shared/constants'
 import { SessionError } from '../shared/errors'
-import type { SessionState } from '../planning/types'
+import { exists, readJSON } from '../shared/fs'
 
 export async function readSession(projectRoot: string): Promise<SessionState | null> {
   const sessionPath = path.join(projectRoot, SEDIM_SESSION_FILE)

@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { writeText, exists, readText } from '../shared/fs'
 import { SEDIM_LATEST_LOG } from '../shared/constants'
+import { exists, readText, writeText } from '../shared/fs'
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
@@ -10,7 +10,7 @@ export async function log(
   projectRoot: string,
   level: LogLevel,
   message: string,
-  data?: unknown
+  data?: unknown,
 ): Promise<void> {
   try {
     const logPath = path.join(projectRoot, SEDIM_LATEST_LOG)
@@ -26,8 +26,8 @@ export async function log(
 }
 
 export const logger = {
-  info:  (root: string, msg: string, data?: unknown) => log(root, 'info', msg, data),
-  warn:  (root: string, msg: string, data?: unknown) => log(root, 'warn', msg, data),
+  info: (root: string, msg: string, data?: unknown) => log(root, 'info', msg, data),
+  warn: (root: string, msg: string, data?: unknown) => log(root, 'warn', msg, data),
   error: (root: string, msg: string, data?: unknown) => log(root, 'error', msg, data),
   debug: (root: string, msg: string, data?: unknown) => log(root, 'debug', msg, data),
 }

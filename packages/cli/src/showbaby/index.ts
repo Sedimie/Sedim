@@ -1,6 +1,23 @@
-export { showIntro, showOutro, showCancel } from './intro'
-export { createSpinner, spinDetecting, logStep, logInfo, logSuccess, logWarn, logError, logSection, logNote, runTasks } from './steps'
-export { handleCancel, confirm, select, multiselect, text } from './prompts'
-export { showError, showDoctorReport } from './errors'
-export { showDetectionSummary, showPlanSummary, showEndReport, showConflict, showDiff } from './summary'
 export type { DoctorCheck } from './errors'
+export { showDoctorReport, showError } from './errors'
+export { showCancel, showIntro, showOutro } from './intro'
+export { confirm, handleCancel, multiselect, select, text } from './prompts'
+export {
+  createSpinner,
+  logError,
+  logInfo,
+  logNote,
+  logSection,
+  logStep,
+  logSuccess,
+  logWarn,
+  runTasks,
+  spinDetecting,
+} from './steps'
+export {
+  showConflict,
+  showDetectionSummary,
+  showDiff,
+  showEndReport,
+  showPlanSummary,
+} from './summary'

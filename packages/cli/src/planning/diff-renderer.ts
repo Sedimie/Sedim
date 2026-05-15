@@ -7,13 +7,13 @@ export function renderPlanSummary(plan: InstallPlan): string {
 
   if (plan.filesToCreate.length) {
     lines.push('Files to create:')
-    plan.filesToCreate.forEach(f => lines.push(`  + ${f.path}`))
+    for (const f of plan.filesToCreate) lines.push(`  + ${f.path}`)
     lines.push('')
   }
 
   if (plan.filesToModify.length) {
     lines.push('Files to modify:')
-    plan.filesToModify.forEach(f => lines.push(`  ~ ${f.path} (${f.description})`))
+    for (const f of plan.filesToModify) lines.push(`  ~ ${f.path} (${f.description})`)
     lines.push('')
   }
 
@@ -27,12 +27,13 @@ export function renderPlanSummary(plan: InstallPlan): string {
 
   if (plan.envVarsToAdd.length) {
     lines.push('Env vars required:')
-    plan.envVarsToAdd.forEach(e => lines.push(`  ${e.key} — ${e.description}`))
+    for (const e of plan.envVarsToAdd) lines.push(`  ${e.key} — ${e.description}`)
   }
 
   if (plan.conflictActions.length) {
     lines.push('Conflicts:')
-    plan.conflictActions.forEach(c => lines.push(`  ! ${c.file} (${c.level}) — ${c.description}`))
+    for (const c of plan.conflictActions)
+      lines.push(`  ! ${c.file} (${c.level}) — ${c.description}`)
   }
 
   return lines.join('\n')

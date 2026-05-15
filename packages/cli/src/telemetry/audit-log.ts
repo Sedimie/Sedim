@@ -1,6 +1,6 @@
 import path from 'node:path'
-import { writeJSON, exists, readJSON } from '../shared/fs'
 import { SEDIM_DIR } from '../shared/constants'
+import { exists, readJSON, writeJSON } from '../shared/fs'
 
 interface AuditEntry {
   timestamp: string
@@ -16,13 +16,11 @@ interface AuditEntry {
 // this is what sedim doctor reads to show history
 export async function writeAuditEntry(
   projectRoot: string,
-  entry: Omit<AuditEntry, 'timestamp'>
+  entry: Omit<AuditEntry, 'timestamp'>,
 ): Promise<void> {
   try {
     const auditPath = path.join(projectRoot, SEDIM_DIR, 'audit.json')
-    const existing = (await exists(auditPath))
-      ? await readJSON<AuditEntry[]>(auditPath)
-      : []
+    const existing = (await exists(auditPath)) ? await readJSON<AuditEntry[]>(auditPath) : []
 
     existing.push({ ...entry, timestamp: new Date().toISOString() })
 

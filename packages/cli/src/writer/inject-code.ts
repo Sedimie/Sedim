@@ -1,8 +1,8 @@
 import path from 'node:path'
-import { exists, readText, writeText } from '../shared/fs'
-import { WriteError } from '../shared/errors'
-import { backupFile } from './patch-file'
 import type { InjectionAction } from '../planning/types'
+import { WriteError } from '../shared/errors'
+import { exists, readText, writeText } from '../shared/fs'
+import { backupFile } from './patch-file'
 
 // injects a code payload at an anchor point in a file
 // anchor is the exact text to find — payload goes before or after it
@@ -10,7 +10,7 @@ import type { InjectionAction } from '../planning/types'
 export async function injectCode(
   projectRoot: string,
   action: InjectionAction,
-  backup = true
+  backup = true,
 ): Promise<'injected' | 'skipped'> {
   const absPath = path.join(projectRoot, action.file)
 
@@ -18,7 +18,7 @@ export async function injectCode(
     throw new WriteError(
       `Cannot inject into "${action.file}" — file does not exist`,
       undefined,
-      'Check that the file path in the plan is correct.'
+      'Check that the file path in the plan is correct.',
     )
   }
 
@@ -36,13 +36,14 @@ export async function injectCode(
       throw new WriteError(
         `Injection anchor not found in "${action.file}"`,
         undefined,
-        `Expected to find: ${action.anchor.slice(0, 80)}\n\nYou may need to add this manually.`
+        `Expected to find: ${action.anchor.slice(0, 80)}\n\nYou may need to add this manually.`,
       )
     }
 
-    const injected = action.position === 'after'
-      ? content.replace(action.anchor, `${action.anchor}\n${action.payload}`)
-      : content.replace(action.anchor, `${action.payload}\n${action.anchor}`)
+    const injected =
+      action.position === 'after'
+        ? content.replace(action.anchor, `${action.anchor}\n${action.payload}`)
+        : content.replace(action.anchor, `${action.payload}\n${action.anchor}`)
 
     await writeText(absPath, injected)
     return 'injected'

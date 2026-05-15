@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { Project } from 'ts-morph'
-import { exists, readText, writeText } from '../shared/fs'
 import { WriteError } from '../shared/errors'
+import { exists, readText, writeText } from '../shared/fs'
 
 // adds an import statement to a file without duplicating it
 // uses ts-morph to find the last existing import and insert after it
@@ -9,7 +9,7 @@ import { WriteError } from '../shared/errors'
 export async function injectImport(
   projectRoot: string,
   filePath: string,
-  importStatement: string
+  importStatement: string,
 ): Promise<'injected' | 'skipped'> {
   const absPath = path.join(projectRoot, filePath)
 
@@ -17,7 +17,7 @@ export async function injectImport(
     throw new WriteError(
       `Cannot inject import into "${filePath}" — file does not exist`,
       undefined,
-      'Check that the file path in the plan is correct.'
+      'Check that the file path in the plan is correct.',
     )
   }
 
@@ -35,9 +35,9 @@ export async function injectImport(
 
     // check if this import already exists — skip if so
     if (specifier) {
-      const alreadyImported = sf.getImportDeclarations().some(
-        imp => imp.getModuleSpecifierValue() === specifier
-      )
+      const alreadyImported = sf
+        .getImportDeclarations()
+        .some(imp => imp.getModuleSpecifierValue() === specifier)
       if (alreadyImported) return 'skipped'
     }
 

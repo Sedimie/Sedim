@@ -1,10 +1,6 @@
 import path from 'node:path'
+import type { ConflictAction, ConflictLevel, DetectedContext } from '../planning/types'
 import { exists } from '../shared/fs'
-import type {
-  DetectedContext,
-  ConflictAction,
-  ConflictLevel,
-} from '../planning/types'
 
 export interface ConflictResult {
   level: ConflictLevel
@@ -17,7 +13,7 @@ export async function classifyConflicts(
   projectRoot: string,
   ctx: DetectedContext,
   filesToCreate: string[],
-  schemaTables: string[]
+  schemaTables: string[],
 ): Promise<ConflictResult> {
   const actions: ConflictAction[] = []
 
@@ -63,11 +59,7 @@ export async function classifyConflicts(
   // partial = some files exist or schema conflicts
   // none  = clean slate
   const hasFullConflict = ctx.conflicts.existingAuthDetected && actions.length > 1
-  const level: ConflictLevel = hasFullConflict
-    ? 'full'
-    : actions.length > 0
-    ? 'partial'
-    : 'none'
+  const level: ConflictLevel = hasFullConflict ? 'full' : actions.length > 0 ? 'partial' : 'none'
 
   return { level, actions }
 }
