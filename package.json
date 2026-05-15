@@ -5,18 +5,28 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepare": "husky"
   },
   "lint-staged": {
     "packages/cli/src/**/*.ts": [
-      "biome check --write --no-errors-on-unmatched"
+      "biome check --write --no-errors-on-unmatched",
+      "vitest run --reporter=verbose --project=cli"
+    ],
+    "packages/cli/tests/**/*.ts": [
+      "biome check --write --no-errors-on-unmatched",
+      "vitest run --reporter=verbose --project=cli"
     ]
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
+    "@vitest/coverage-v8": "^4.1.6",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
-    "turbo": "2.9.12"
+    "turbo": "2.9.12",
+    "vitest": "^4.1.6"
   },
   "packageManager": "pnpm@9.0.0"
 }
