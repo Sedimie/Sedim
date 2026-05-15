@@ -1,0 +1,12 @@
+{
+  "name": "fixture-hono-no-orm-js",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  }
+}

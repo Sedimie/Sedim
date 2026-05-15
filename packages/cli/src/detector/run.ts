@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const target = process.argv[2]
   ? path.resolve(process.argv[2])
-  : path.resolve(__dirname, '../../../../apps/playground')
+  : path.resolve(__dirname, '../../../../apps/playground/nextjs-drizzle-ts')
 
 console.log(`\nRunning detector against: ${target}\n`)
 
