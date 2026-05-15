@@ -1,0 +1,41 @@
+export type {
+  // primitives
+  Language,
+  ModuleSystem,
+  PackageManager,
+  Framework,
+  ORM,
+  DBType,
+  RouterStyle,
+  LayoutStyle,
+  ConflictLevel,
+  UILevel,
+  InjectionType,
+  FileOperation,
+  // detector
+  Detected,
+  ProjectStructure,
+  SchemaSignals,
+  AppEntrypoint,
+  InjectionAnchor,
+  CodeArchitecture,
+  ConflictSignals,
+  DetectedContext,
+  // plan
+  FileToCreate,
+  FileToModify,
+  InjectionAction,
+  ConflictAction,
+  InstallPlan,
+  InstalledModuleState,
+  // manifest
+  ModuleManifestLayers,
+  ModuleManifest,
+  // plan config — module authors use these
+  TemplateConfig,
+  InjectionVariant,
+  InjectionConfig,
+  EnvVarConfig,
+  PeerContract,
+  PlanConfig,
+} from './types'
