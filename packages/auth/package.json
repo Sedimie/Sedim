@@ -1,0 +1,29 @@
+{
+  "name": "@sedim/auth",
+  "version": "0.1.0",
+  "description": "Auth module for sedim — stamps production-ready auth into your project",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.ts",
+    "./adapters": "./src/adapters/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@oslojs/crypto": "^1.0.1",
+    "@oslojs/encoding": "^1.1.0",
+    "@oslojs/oauth2": "^0.5.0",
+    "@sedim/core": "workspace:*",
+    "argon2": "^0.43.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "typescript": "^6.0.3"
+  }
+}
