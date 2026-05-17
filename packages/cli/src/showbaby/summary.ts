@@ -1,5 +1,6 @@
 import * as clack from '@clack/prompts'
 import chalk from 'chalk'
+import { diffLines } from 'diff'
 import type { ConflictAction, DetectedContext, InstallPlan } from '../planning/types'
 
 // ============================================================
@@ -159,31 +160,38 @@ export function showConflict(conflict: ConflictAction): void {
 
 // ============================================================
 // showDiff — per-file diff preview for sedim diff
-// simple +/- line format, not a full git diff
+// uses proper line-level diffing via the `diff` package
 // ============================================================
 
 export function showDiff(file: string, before: string, after: string): void {
-  const beforeLines = before.split('\n')
-  const afterLines = after.split('\n')
+  const changes = diffLines(before, after)
 
-  const diffLines: string[] = []
+  const outputLines: string[] = []
 
-  // naive line diff — removed lines then added lines
-  // good enough for showing what changes, not a real diff algorithm
-  for (const line of beforeLines) {
-    if (!afterLines.includes(line)) {
-      diffLines.push(chalk.red(`  - ${line}`))
+  for (const change of changes) {
+    // split into individual lines, drop trailing empty string from split
+    const lines = change.value.split('\n')
+    if (lines[lines.length - 1] === '') lines.pop()
+
+    if (change.added) {
+      for (const line of lines) outputLines.push(chalk.green(`  + ${line}`))
+    } else if (change.removed) {
+      for (const line of lines) outputLines.push(chalk.red(`  - ${line}`))
+    } else {
+      // unchanged context — show up to 2 lines around changes, collapse the rest
+      if (lines.length <= 4) {
+        for (const line of lines) outputLines.push(chalk.dim(`    ${line}`))
+      } else {
+        for (const line of lines.slice(0, 2)) outputLines.push(chalk.dim(`    ${line}`))
+        outputLines.push(chalk.dim(`    ... ${lines.length - 4} unchanged lines ...`))
+        for (const line of lines.slice(-2)) outputLines.push(chalk.dim(`    ${line}`))
+      }
     }
   }
-  for (const line of afterLines) {
-    if (!beforeLines.includes(line)) {
-      diffLines.push(chalk.green(`  + ${line}`))
-    }
+
+  if (outputLines.length === 0) {
+    outputLines.push(chalk.dim('  no changes'))
   }
 
-  if (diffLines.length === 0) {
-    diffLines.push(chalk.dim('  no changes'))
-  }
-
-  clack.note(diffLines.join('\n'), chalk.bold(file))
+  clack.note(outputLines.join('\n'), chalk.bold(file))
 }
