@@ -222,8 +222,9 @@ export function createAuthPlanConfig(
 
     // themed CSS tokens
     if (uiStyle === 'themed') {
+      const themeVariant = selectedFeatures.find(f => ['modern', 'minimal', 'colorful'].includes(f)) || 'modern'
       templates.push({
-        templateKey: 'auth/ui/themed/tokens.css',
+        templateKey: `auth/ui/themed/${themeVariant}-tokens.css`,
         outputPath: () => `${authDir}/ui/tokens.css`,
         overwriteStrategy: 'skip',
       })
