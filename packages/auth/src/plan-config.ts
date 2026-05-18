@@ -164,6 +164,101 @@ export function createAuthPlanConfig(
     overwriteStrategy: 'skip',
   })
 
+  // ── UI components — conditional on selected features + ui style ──
+  const uiStyle = selectedFeatures.includes('tailwind') ? 'tailwind'
+    : selectedFeatures.includes('themed') ? 'themed'
+    : 'headless'
+
+  // auth-client and useAuth hook — always stamped when any UI is needed
+  // (Next.js only for now — Express/Hono don't have a React frontend by default)
+  if (framework === 'nextjs') {
+    templates.push({
+      templateKey: 'auth/ui/auth-client',
+      outputPath: () => `${authDir}/ui/auth-client.ts`,
+      overwriteStrategy: 'skip',
+    })
+    templates.push({
+      templateKey: 'auth/ui/use-auth',
+      outputPath: () => `${authDir}/ui/use-auth.ts`,
+      overwriteStrategy: 'skip',
+    })
+
+    // email+password forms
+    if (selectedFeatures.includes('email-password')) {
+      templates.push(
+        { templateKey: `auth/ui/${uiStyle}/LoginForm`, outputPath: () => `${authDir}/ui/LoginForm.tsx`, overwriteStrategy: 'skip' },
+        { templateKey: `auth/ui/${uiStyle}/SignupForm`, outputPath: () => `${authDir}/ui/SignupForm.tsx`, overwriteStrategy: 'skip' },
+        { templateKey: `auth/ui/${uiStyle}/ForgotPasswordForm`, outputPath: () => `${authDir}/ui/ForgotPasswordForm.tsx`, overwriteStrategy: 'skip' },
+        { templateKey: `auth/ui/${uiStyle}/ResetPasswordForm`, outputPath: () => `${authDir}/ui/ResetPasswordForm.tsx`, overwriteStrategy: 'skip' },
+      )
+    }
+
+    // magic link form
+    if (selectedFeatures.includes('magic-link')) {
+      templates.push({
+        templateKey: `auth/ui/${uiStyle}/MagicLinkForm`,
+        outputPath: () => `${authDir}/ui/MagicLinkForm.tsx`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // oauth buttons
+    if (selectedFeatures.some(f => f.startsWith('oauth-'))) {
+      templates.push({
+        templateKey: `auth/ui/${uiStyle}/OAuthButton`,
+        outputPath: () => `${authDir}/ui/OAuthButton.tsx`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // totp form
+    if (selectedFeatures.includes('totp')) {
+      templates.push({
+        templateKey: `auth/ui/${uiStyle}/TotpVerifyForm`,
+        outputPath: () => `${authDir}/ui/TotpVerifyForm.tsx`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // themed CSS tokens
+    if (uiStyle === 'themed') {
+      templates.push({
+        templateKey: 'auth/ui/themed/tokens.css',
+        outputPath: () => `${authDir}/ui/tokens.css`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // pages — stamp actual Next.js page files so /login, /signup etc work immediately
+    const hasPasswordOrMagic = selectedFeatures.includes('email-password') || selectedFeatures.includes('magic-link')
+    const hasOAuth = selectedFeatures.some(f => f.startsWith('oauth-'))
+
+    if (hasPasswordOrMagic || hasOAuth) {
+      templates.push({
+        templateKey: 'auth/ui/pages/login-page',
+        outputPath: () => `${src}/app/login/page.tsx`,
+        overwriteStrategy: 'ask',
+      })
+    }
+    if (selectedFeatures.includes('email-password')) {
+      templates.push({
+        templateKey: 'auth/ui/pages/signup-page',
+        outputPath: () => `${src}/app/signup/page.tsx`,
+        overwriteStrategy: 'ask',
+      })
+      templates.push({
+        templateKey: 'auth/ui/pages/forgot-password-page',
+        outputPath: () => `${src}/app/forgot-password/page.tsx`,
+        overwriteStrategy: 'ask',
+      })
+      templates.push({
+        templateKey: 'auth/ui/pages/reset-password-page',
+        outputPath: () => `${src}/app/reset-password/page.tsx`,
+        overwriteStrategy: 'ask',
+      })
+    }
+  }
+
   // DB adapter wiring file — one level above sedim/auth
   templates.push({
     templateKey: `auth/templates/adapter/${orm}`,
@@ -210,6 +305,24 @@ export function createAuthPlanConfig(
 
   // ── injections — minimal, only where unavoidable ──────────
   const injections: PlanConfig['injections'] = []
+
+  // themed variant: inject tokens.css import into root layout
+  if (framework === 'nextjs' && uiStyle === 'themed') {
+    injections.push({
+      type: 'import',
+      target: (c: DetectedContext) => {
+        const s = c.structure.srcDir ?? 'src'
+        return `${s}/app/layout.tsx`
+      },
+      variants: {
+        nextjs: {
+          payload: `import '@/sedim/auth/ui/tokens.css'`,
+          anchor: `export default`,
+          position: 'before',
+        },
+      },
+    })
+  }
 
   // Express: one import + one mount in entry file — unavoidable
   if (framework === 'express') {
@@ -284,19 +397,19 @@ export function createAuthPlanConfig(
     },
   ]
 
-  if (features.includes('oauth-google')) {
+  if (selectedFeatures.includes('oauth-google')) {
     envVars.push(
       { key: 'GOOGLE_CLIENT_ID', description: 'Google OAuth client ID from console.cloud.google.com', required: true },
       { key: 'GOOGLE_CLIENT_SECRET', description: 'Google OAuth client secret', required: true },
     )
   }
-  if (features.includes('oauth-github')) {
+  if (selectedFeatures.includes('oauth-github')) {
     envVars.push(
       { key: 'GITHUB_CLIENT_ID', description: 'GitHub OAuth client ID from github.com/settings/developers', required: true },
       { key: 'GITHUB_CLIENT_SECRET', description: 'GitHub OAuth client secret', required: true },
     )
   }
-  if (features.includes('oauth-discord')) {
+  if (selectedFeatures.includes('oauth-discord')) {
     envVars.push(
       { key: 'DISCORD_CLIENT_ID', description: 'Discord OAuth client ID from discord.com/developers', required: true },
       { key: 'DISCORD_CLIENT_SECRET', description: 'Discord OAuth client secret', required: true },
