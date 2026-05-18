@@ -56,20 +56,17 @@ export function createAuthPlanConfig(
     outputPath: () => `${authDir}/core/session.ts`,
     overwriteStrategy: 'skip',
   })
-  if (features.some(f => f.startsWith('oauth-'))) {
-    templates.push({
-      templateKey: 'auth/core/pkce',
-      outputPath: () => `${authDir}/core/pkce.ts`,
-      overwriteStrategy: 'skip',
-    })
-  }
-  if (features.includes('totp')) {
-    templates.push({
-      templateKey: 'auth/core/totp',
-      outputPath: () => `${authDir}/core/totp.ts`,
-      overwriteStrategy: 'skip',
-    })
-  }
+  // pkce.ts and totp.ts are always stamped — operations.ts imports both unconditionally
+  templates.push({
+    templateKey: 'auth/core/pkce',
+    outputPath: () => `${authDir}/core/pkce.ts`,
+    overwriteStrategy: 'skip',
+  })
+  templates.push({
+    templateKey: 'auth/core/totp',
+    outputPath: () => `${authDir}/core/totp.ts`,
+    overwriteStrategy: 'skip',
+  })
 
   // adapter types — always stamped
   templates.push({
@@ -267,6 +264,16 @@ export function createAuthPlanConfig(
     overwriteStrategy: 'ask',
   })
 
+  // DB client — stamp src/db/index.ts if it doesn't exist yet
+  // uses the detected driver to generate the correct Drizzle setup
+  if (orm === 'drizzle') {
+    templates.push({
+      templateKey: 'auth/db/client',
+      outputPath: () => `${src}/db/index.ts`,
+      overwriteStrategy: 'skip', // never overwrite — user may have customised their db client
+    })
+  }
+
   // Next.js: new files only — no existing file touched
   if (framework === 'nextjs') {
     templates.push({
@@ -383,6 +390,12 @@ export function createAuthPlanConfig(
 
   // ── env vars — filtered by selected features ──────────────
   const envVars: PlanConfig['envVars'] = [
+    {
+      key: 'DATABASE_URL',
+      description: 'Database connection string.',
+      example: 'postgresql://user:password@localhost:5432/mydb',
+      required: true,
+    },
     {
       key: 'AUTH_SECRET',
       description: 'Random secret for signing session tokens. Min 32 characters.',
