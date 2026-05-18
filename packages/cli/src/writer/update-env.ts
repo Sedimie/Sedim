@@ -35,7 +35,7 @@ export async function updateEnv(
     newLines.push(`# ${v.description}`)
     const placeholder = v.example ? `# example: ${v.example}` : null
     if (placeholder) newLines.push(placeholder)
-    newLines.push(`${v.key}=`)
+    newLines.push(`${v.key}=${v.default ?? ''}`)
   }
 
   try {

@@ -15,6 +15,13 @@ program
   .name('sedim')
   .description('Install complete features, not dependencies.')
   .version(CLI_VERSION)
+  .option('--cwd <path>', 'Run as if sedim was started in <path> instead of the current directory')
+  .hook('preAction', thisCommand => {
+    const opts = thisCommand.opts()
+    if (opts.cwd) {
+      process.chdir(opts.cwd)
+    }
+  })
 
 program
   .command('init')

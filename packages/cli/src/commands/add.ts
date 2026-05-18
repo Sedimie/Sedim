@@ -35,8 +35,13 @@ export async function runAdd(
       true,
     )
     if (resume) {
-      ui.logInfo('Resuming session — run `sedim continue` for full resume flow.')
+      ui.logInfo('Run `sedim continue` to resume the interrupted install.')
+      ui.showOutro('Use `sedim continue` to pick up where you left off.')
+      return
     }
+    // user chose not to resume — clear the stale session and start fresh
+    const { clearSession } = await import('../session/index.js')
+    await clearSession(projectRoot)
   }
 
   // ── detection ────────────────────────────────────────────
@@ -75,16 +80,37 @@ export async function runAdd(
   const selections: Record<string, unknown> = {}
 
   if (manifest.features.providers?.length) {
+    const providerLabels: Record<string, { label: string; hint: string }> = {
+      'email-password': { label: 'Email + Password', hint: 'classic credential auth' },
+      'magic-link': { label: 'Magic Link', hint: 'passwordless email login' },
+      'oauth-google': { label: 'Google OAuth', hint: 'sign in with Google' },
+      'oauth-github': { label: 'GitHub OAuth', hint: 'sign in with GitHub' },
+      'oauth-discord': { label: 'Discord OAuth', hint: 'sign in with Discord' },
+      totp: { label: 'TOTP (2FA)', hint: 'Google Authenticator, Authy' },
+    }
     selections.providers = await ui.multiselect(
-      'Which providers?',
-      manifest.features.providers.map(p => ({ value: p, label: p })),
+      'Which auth providers?',
+      manifest.features.providers.map(p => ({
+        value: p,
+        label: providerLabels[p]?.label ?? p,
+        hint: providerLabels[p]?.hint,
+      })),
     )
   }
 
   if (manifest.features.ui?.length) {
+    const uiLabels: Record<string, { label: string; hint: string }> = {
+      headless: { label: 'Headless', hint: 'unstyled, full control' },
+      tailwind: { label: 'Tailwind', hint: 'pre-styled with Tailwind CSS' },
+      themed: { label: 'Themed', hint: 'pre-built theme variants' },
+    }
     selections.ui = await ui.select(
-      'UI style?',
-      manifest.features.ui.map(u => ({ value: u, label: u })),
+      'UI style for auth components?',
+      manifest.features.ui.map(u => ({
+        value: u,
+        label: uiLabels[u]?.label ?? u,
+        hint: uiLabels[u]?.hint,
+      })),
     )
   }
 
@@ -118,6 +144,17 @@ export async function runAdd(
     planSpinner.fail('Planning failed')
     ui.showError(err)
     process.exit(1)
+  }
+
+  // surface unsupported stack warnings before showing the plan
+  const unsupported = (planConfig as Record<string, unknown>)['_unsupportedReasons'] as
+    | string[]
+    | undefined
+  if (unsupported?.length) {
+    for (const reason of unsupported) {
+      ui.logWarn(reason)
+    }
+    ui.showCancel('Cannot proceed — resolve the issues above first.')
   }
 
   ui.showPlanSummary(plan)
@@ -177,7 +214,56 @@ export async function runAdd(
   ui.logSection('Writing')
 
   try {
-    await applyPlan(projectRoot, plan)
+    await ui.runTasks([
+      {
+        title: 'Installing dependencies',
+        enabled: plan.dependenciesToInstall.length > 0 || plan.devDependenciesToInstall.length > 0,
+        task: async () => {
+          const { installDependencies } = await import('../shared/package-manager.js')
+          if (plan.dependenciesToInstall.length > 0) {
+            await installDependencies(plan.dependenciesToInstall, projectRoot, false)
+          }
+          if (plan.devDependenciesToInstall.length > 0) {
+            await installDependencies(plan.devDependenciesToInstall, projectRoot, true)
+          }
+          return `${plan.dependenciesToInstall.length + plan.devDependenciesToInstall.length} packages installed`
+        },
+      },
+      {
+        title: `Stamping ${plan.filesToCreate.length} file${plan.filesToCreate.length !== 1 ? 's' : ''}`,
+        task: async () => {
+          const { writeFile } = await import('../writer/write-file.js')
+          for (const file of plan.filesToCreate) {
+            const conflictAction = plan.conflictActions.find(c => c.file === file.path)
+            const strategy = conflictAction?.resolution === 'skip' ? 'skip' : 'overwrite'
+            await writeFile(projectRoot, file, strategy)
+          }
+          return `${plan.filesToCreate.length} files written`
+        },
+      },
+      {
+        title: 'Injecting wiring',
+        enabled: plan.injectionActions.length > 0,
+        task: async () => {
+          const { injectImport } = await import('../writer/inject-imports.js')
+          const { injectCode } = await import('../writer/inject-code.js')
+          const imports = plan.injectionActions.filter(a => a.type === 'import')
+          const code = plan.injectionActions.filter(a => a.type !== 'import')
+          for (const action of imports) await injectImport(projectRoot, action.file, action.payload)
+          for (const action of code) await injectCode(projectRoot, action)
+          return `${plan.injectionActions.length} injection${plan.injectionActions.length !== 1 ? 's' : ''} applied`
+        },
+      },
+      {
+        title: 'Updating .env',
+        enabled: plan.envVarsToAdd.length > 0,
+        task: async () => {
+          const { updateEnv } = await import('../writer/update-env.js')
+          await updateEnv(projectRoot, plan.envVarsToAdd)
+          return `${plan.envVarsToAdd.length} env var${plan.envVarsToAdd.length !== 1 ? 's' : ''} added`
+        },
+      },
+    ])
   } catch (err) {
     ui.showError(err)
     await writeAuditEntry(projectRoot, {

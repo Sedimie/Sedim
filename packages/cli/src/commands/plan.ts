@@ -6,7 +6,7 @@ import { findProjectRoot } from '../shared/fs'
 import * as ui from '../showbaby/index'
 import { buildPlan } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
-import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
+import { loadPlanConfig } from '../thinker/load-plan-config'
 
 export async function runPlan(moduleName: string): Promise<void> {
   ui.showIntro(`plan ${moduleName}`)
@@ -42,14 +42,27 @@ export async function runPlan(moduleName: string): Promise<void> {
 
   let plan: InstallPlan
   const planSpinner = ui.createSpinner('Building plan...')
+  let planConfig: import('../planning/types').PlanConfig
   try {
-    const planConfig = manifestToPlanConfig(manifest, [], ctx)
+    // use empty selectedFeatures for plan preview — shows full possible plan
+    planConfig = await loadPlanConfig(moduleName, manifest, ctx, [])
     plan = await buildPlan(ctx, planConfig, [])
     planSpinner.stop('Plan ready')
   } catch (err) {
     planSpinner.fail('Planning failed')
     ui.showError(err)
     process.exit(1)
+  }
+
+  // surface unsupported stack warnings — plan still shows so user can see what would happen
+  const unsupported = (planConfig as Record<string, unknown>)['_unsupportedReasons'] as
+    | string[]
+    | undefined
+  if (unsupported?.length) {
+    for (const reason of unsupported) {
+      ui.logWarn(reason)
+    }
+    ui.logNote('This stack is not supported. Plan shown for reference only.', 'Unsupported Stack')
   }
 
   ui.showPlanSummary(plan)

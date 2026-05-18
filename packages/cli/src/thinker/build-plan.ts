@@ -9,6 +9,7 @@ import type {
 } from '../planning/types'
 import { PlanError } from '../shared/errors'
 import { classifyConflicts } from './classify-conflicts'
+import { resolveTemplate } from './resolve-template'
 
 // minimum manifest version the thinker can process
 // bump this when PlanConfig or InstallPlan shapes change in a breaking way
@@ -52,13 +53,26 @@ export async function buildPlan(
 
   const framework = ctx.framework.value
 
-  // ── 1. resolve template output paths ──────────────────────
+  // ── 1. resolve template output paths + content ────────────
   // each template's outputPath is a function — call it with ctx
-  // to get the actual file path for this project's structure
-  const filesToCreate: FileToCreate[] = config.templates.map(template => ({
-    path: template.outputPath(ctx),
-    templateKey: template.templateKey,
-  }))
+  // content is resolved from the template registry
+  const filesToCreate: FileToCreate[] = await Promise.all(
+    config.templates.map(async template => {
+      let content: string | undefined
+      try {
+        content = await resolveTemplate(template.templateKey, ctx, selectedFeatures)
+      } catch {
+        // template not found — writer will surface this as an error
+        // don't fail the whole plan for one missing template
+        content = undefined
+      }
+      return {
+        path: template.outputPath(ctx),
+        templateKey: template.templateKey,
+        content,
+      }
+    }),
+  )
 
   // ── 2. resolve injection targets and anchors ───────────────
   const injectionActions: InjectionAction[] = []
