@@ -5,9 +5,13 @@ import { exists, readText, writeText } from '../shared/fs'
 // merges new env vars into .env without overwriting existing values
 // if .env doesn't exist, creates it
 // never overwrites a key that already has a value — user owns their secrets
+//
+// collectedValues: map of key → value collected from interactive prompts
+// if a key is in collectedValues, that value is used instead of the default
 export async function updateEnv(
   projectRoot: string,
   envVars: Array<{ key: string; description: string; example?: string }>,
+  collectedValues: Map<string, string> = new Map(),
 ): Promise<void> {
   if (envVars.length === 0) return
 
@@ -24,7 +28,6 @@ export async function updateEnv(
 
   const newLines: string[] = []
 
-  // add a section header if we're adding anything
   const toAdd = envVars.filter(v => !existingKeys.has(v.key))
   if (toAdd.length === 0) return
 
@@ -33,9 +36,9 @@ export async function updateEnv(
 
   for (const v of toAdd) {
     newLines.push(`# ${v.description}`)
-    const placeholder = v.example ? `# example: ${v.example}` : null
-    if (placeholder) newLines.push(placeholder)
-    newLines.push(`${v.key}=${v.default ?? ''}`)
+    if (v.example) newLines.push(`# example: ${v.example}`)
+    const value = collectedValues.get(v.key) ?? ''
+    newLines.push(`${v.key}=${value}`)
   }
 
   try {
