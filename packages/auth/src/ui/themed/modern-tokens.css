@@ -1,0 +1,84 @@
+/* src/sedim/auth/ui/themed/tokens.css */
+/* ── Auth UI design tokens ───────────────────────────────────── */
+/* Import this file once in your root layout or global CSS.      */
+/* Override any variable to retheme the entire auth UI.          */
+
+:root {
+  --auth-bg: rgba(255, 255, 255, 0.7);
+  --auth-fg: #111827;
+  --auth-muted: #6b7280;
+  --auth-border: rgba(255, 255, 255, 0.5);
+  --auth-input-bg: rgba(255, 255, 255, 0.5);
+  --auth-input-focus-ring: #3b82f6;
+  --auth-btn-bg: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --auth-btn-fg: #ffffff;
+  --auth-btn-hover-bg: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  --auth-error-fg: #dc2626;
+  --auth-error-bg: rgba(254, 242, 242, 0.8);
+  --auth-error-border: #fecaca;
+  --auth-success-fg: #16a34a;
+  --auth-success-bg: rgba(240, 253, 244, 0.8);
+  --auth-radius: 16px;
+  --auth-font-size-sm: 0.875rem;
+}
+
+/* Glassmorphic overrides */
+form {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07) !important;
+  padding: 2rem !important;
+  border-radius: var(--auth-radius) !important;
+}
+input {
+  backdrop-filter: blur(4px) !important;
+  transition: box-shadow 0.2s, border 0.2s;
+}
+input:focus {
+  border-color: var(--auth-input-focus-ring) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+button {
+  background: var(--auth-btn-bg) !important;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+  border-radius: 8px !important;
+}
+button:hover {
+  background: var(--auth-btn-hover-bg) !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.23) !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-theme="dark"] form {
+  background: rgba(17, 24, 39, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] {
+  --auth-bg: rgba(17, 24, 39, 0.7);
+  --auth-fg: #f9fafb;
+  --auth-muted: #9ca3af;
+  --auth-border: rgba(255, 255, 255, 0.1);
+  --auth-input-bg: rgba(31, 41, 55, 0.5);
+  --auth-input-focus-ring: #3b82f6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --auth-bg: rgba(17, 24, 39, 0.7);
+    --auth-fg: #f9fafb;
+    --auth-muted: #9ca3af;
+    --auth-border: rgba(255, 255, 255, 0.1);
+    --auth-input-bg: rgba(31, 41, 55, 0.5);
+    --auth-input-focus-ring: #3b82f6;
+  }
+  form {
+    background: rgba(17, 24, 39, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+  }
+}
