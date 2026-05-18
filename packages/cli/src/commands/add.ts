@@ -8,7 +8,7 @@ import { writeAuditEntry } from '../telemetry/audit-log'
 import { logger } from '../telemetry/logger'
 import { buildPlan } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
-import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
+import { loadPlanConfig } from '../thinker/load-plan-config'
 import { applyPlan } from '../writer/index'
 
 export async function runAdd(
@@ -106,8 +106,9 @@ export async function runAdd(
     ...((selections.authorization as string[]) ? [selections.authorization as string] : []),
   ]
 
-  // convert manifest to PlanConfig — real modules will provide their own
-  const planConfig = manifestToPlanConfig(manifest, selectedFeatures, ctx)
+  // load plan config — uses module's own plan-config.ts if available,
+  // falls back to generic manifest conversion
+  const planConfig = await loadPlanConfig(moduleName, manifest, ctx, selectedFeatures)
 
   let plan: InstallPlan
   try {

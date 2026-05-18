@@ -7,7 +7,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./core": "./src/core/index.ts",
-    "./adapters": "./src/adapters/index.ts"
+    "./adapters": "./src/adapters/index.ts",
+    "./plan-config": "./src/plan-config.ts",
+    "./schema": "./src/schema/index.ts",
+    "./contracts": "./src/contracts/index.ts"
   },
   "scripts": {
     "test": "vitest run"
