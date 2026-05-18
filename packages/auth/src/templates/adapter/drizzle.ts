@@ -5,8 +5,8 @@
 // to the file that exports your Drizzle `db` instance.
 
 import { db } from '{{DB_INSTANCE_IMPORT}}'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, lt } from 'drizzle-orm'
 import { createDrizzleAdapter } from './auth/adapters/drizzle.js'
 import { authSchema } from './auth/schema.js'
 
-export const dbAdapter = createDrizzleAdapter(db, authSchema, eq, and)
+export const dbAdapter = createDrizzleAdapter(db, authSchema, eq, and, lt)

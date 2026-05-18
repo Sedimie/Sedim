@@ -4,7 +4,12 @@
 // Components import from here — not raw fetch.
 // If you change basePath in config.ts, update BASE_PATH here too.
 
-const BASE_PATH = '/api/auth'
+const BASE_PATH =
+  typeof process !== 'undefined' && process.env?.['NEXT_PUBLIC_API_URL']
+    ? `${process.env['NEXT_PUBLIC_API_URL']}/api/auth`
+    : typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL
+      ? `${(import.meta as any).env.VITE_API_URL}/api/auth`
+      : '/api/auth'
 
 export interface AuthUser {
   id: string

@@ -106,6 +106,7 @@ export function createDrizzleAdapter(
   schema: AuthDrizzleSchema,
   eq: (col: unknown, val: unknown) => unknown,
   and: (...conditions: unknown[]) => unknown,
+  lt: (col: unknown, val: unknown) => unknown,
 ): DatabaseAdapter {
   return {
     // ── users ───────────────────────────────────────────────
@@ -185,17 +186,12 @@ export function createDrizzleAdapter(
     },
 
     async deleteExpiredOtpTokens(userId) {
-      // Drizzle doesn't have a built-in "less than" shorthand we can use without
-      // importing from drizzle-orm. The stamped version will use lt() directly.
-      // For now, fetch and delete — the template will replace this with a proper query.
-      const rows = await db
-        .select()
-        .from(schema.otpTokens)
-        .where(eq(schema.otpTokens['userId'], userId))
-      const expired = (rows as OtpToken[]).filter(r => r.expiresAt <= new Date())
-      for (const row of expired) {
-        await db.delete(schema.otpTokens).where(eq(schema.otpTokens['id'], row.id))
-      }
+      await db.delete(schema.otpTokens).where(
+        and(
+          eq(schema.otpTokens['userId'], userId),
+          lt(schema.otpTokens['expiresAt'], new Date())
+        )
+      )
     },
 
     // ── oauth accounts ──────────────────────────────────────
