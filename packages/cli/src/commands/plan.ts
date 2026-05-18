@@ -2,7 +2,7 @@ import { isSedimInitialised } from '../config/index'
 import { detect } from '../detector/index'
 import { renderPlanSummary } from '../planning/diff-renderer'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
-import { findProjectRoot } from '../shared/fs'
+import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
 import { buildPlan } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
@@ -11,7 +11,7 @@ import { loadPlanConfig } from '../thinker/load-plan-config'
 export async function runPlan(moduleName: string): Promise<void> {
   ui.showIntro(`plan ${moduleName}`)
 
-  const projectRoot = await findProjectRoot()
+  const projectRoot = await ensureProjectRoot()
 
   if (!(await isSedimInitialised(projectRoot))) {
     ui.showError(new Error('Run `sedim init` first.'))
@@ -24,7 +24,7 @@ export async function runPlan(moduleName: string): Promise<void> {
     ctx = await detect(projectRoot)
     spinner.stop('Stack detected')
   } catch (err) {
-    spinner.fail('Detection failed')
+    spinner.stop('Detection failed')
     ui.showError(err)
     process.exit(1)
   }

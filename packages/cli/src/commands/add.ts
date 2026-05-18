@@ -2,7 +2,7 @@ import { isSedimInitialised, readSedimConfig } from '../config/index'
 import { detect } from '../detector/index'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { readSession, writeSession } from '../session/index'
-import { findProjectRoot } from '../shared/fs'
+import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
 import { writeAuditEntry } from '../telemetry/audit-log'
 import { logger } from '../telemetry/logger'
@@ -18,7 +18,7 @@ export async function runAdd(
   ui.showIntro(`add ${moduleName}`)
   const start = Date.now()
 
-  const projectRoot = await findProjectRoot()
+  const projectRoot = await ensureProjectRoot()
   await logger.info(projectRoot, `add ${moduleName} started`, options)
 
   // ── must be initialised ──────────────────────────────────
@@ -53,7 +53,7 @@ export async function runAdd(
     ctx = await detect(projectRoot)
     spinner.stop('Stack detected')
   } catch (err) {
-    spinner.fail('Detection failed')
+    spinner.stop('Detection failed')
     ui.showError(err)
     process.exit(1)
   }

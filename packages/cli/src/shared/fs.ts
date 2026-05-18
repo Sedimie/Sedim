@@ -1,6 +1,6 @@
 import path from 'node:path'
 import fs from 'fs-extra'
-import { DetectionError, WriteError } from './errors'
+import { DetectionError, WorkspaceRootError, WriteError } from './errors'
 
 export async function exists(filePath: string): Promise<boolean> {
   return fs.pathExists(filePath)
@@ -50,9 +50,15 @@ export async function findProjectRoot(from?: string): Promise<string> {
     if (await exists(path.join(current, 'sedim.config.ts'))) return current
 
     if (await exists(path.join(current, 'package.json'))) {
-      // check if this is a workspace root — if so, it's not an app, keep walking up
+      // check if this is a workspace root — if so, we should stop and notify the caller
       const isWorkspaceRoot = await _isWorkspaceRoot(current)
-      if (!isWorkspaceRoot) return current
+      if (isWorkspaceRoot) {
+        throw new WorkspaceRootError(
+          `Detected workspace root at ${current}. sedim must be run within a specific app directory.`,
+          current,
+        )
+      }
+      return current
     }
 
     const parent = path.dirname(current)

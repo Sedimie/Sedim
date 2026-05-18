@@ -31,6 +31,20 @@ export class DetectionError extends SedimError {
   }
 }
 
+export class WorkspaceRootError extends SedimError {
+  public workspaceRoot: string
+
+  constructor(
+    message: string,
+    workspaceRoot: string,
+    cause?: unknown,
+    nextAction = 'Please run sedim from within your application directory, or use the --cwd flag.',
+  ) {
+    super(message, nextAction, cause)
+    this.workspaceRoot = workspaceRoot
+  }
+}
+
 export class PlanError extends SedimError {
   constructor(
     message: string,

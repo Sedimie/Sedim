@@ -1,7 +1,7 @@
 import { detect } from '../detector/index'
 import type { DetectedContext } from '../planning/types'
 import { clearSession, readSession } from '../session/index'
-import { findProjectRoot } from '../shared/fs'
+import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
 import { writeAuditEntry } from '../telemetry/audit-log'
 import { logger } from '../telemetry/logger'
@@ -11,7 +11,7 @@ export async function runContinue(moduleName?: string): Promise<void> {
   ui.showIntro('continue')
   const start = Date.now()
 
-  const projectRoot = await findProjectRoot()
+  const projectRoot = await ensureProjectRoot()
   await logger.info(projectRoot, 'continue started')
 
   // ── load session ─────────────────────────────────────────
@@ -50,7 +50,7 @@ export async function runContinue(moduleName?: string): Promise<void> {
     ctx = await detect(projectRoot)
     spinner.stop('Project state checked')
   } catch (err) {
-    spinner.fail('Detection failed')
+    spinner.stop('Detection failed')
     ui.showError(err)
     process.exit(1)
   }

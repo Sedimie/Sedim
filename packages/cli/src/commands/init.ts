@@ -2,7 +2,7 @@ import { buildConfig, isSedimInitialised, writeSedimConfig } from '../config/ind
 import { detect } from '../detector/index'
 import type { DetectedContext, SedimConfig } from '../planning/types'
 import { MIN_NODE_VERSION } from '../shared/constants'
-import { findProjectRoot } from '../shared/fs'
+import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
 import { writeAuditEntry } from '../telemetry/audit-log'
 import { logger } from '../telemetry/logger'
@@ -11,7 +11,7 @@ export async function runInit(options: { force?: boolean } = {}): Promise<void> 
   ui.showIntro('init')
 
   // ── find project root ────────────────────────────────────
-  const projectRoot = await findProjectRoot()
+  const projectRoot = await ensureProjectRoot()
   await logger.info(projectRoot, 'init started')
 
   // ── node version check ───────────────────────────────────
@@ -36,7 +36,7 @@ export async function runInit(options: { force?: boolean } = {}): Promise<void> 
     ctx = await detect(projectRoot)
     spinner.stop('Stack detected')
   } catch (err) {
-    spinner.fail('Detection failed')
+    spinner.stop('Detection failed')
     ui.showError(err)
     await writeAuditEntry(projectRoot, { command: 'init', status: 'failed', error: String(err) })
     process.exit(1)

@@ -3,14 +3,15 @@ import { isSedimInitialised } from '../config/index'
 import { detect } from '../detector/index'
 import { readSession } from '../session/index'
 import { MIN_NODE_VERSION } from '../shared/constants'
-import { exists, findProjectRoot } from '../shared/fs'
+import { ensureProjectRoot } from '../shared/ensure-project'
+import { exists } from '../shared/fs'
 import type { DoctorCheck } from '../showbaby/index'
 import * as ui from '../showbaby/index'
 
 export async function runDoctor(): Promise<void> {
   ui.showIntro('doctor')
 
-  const projectRoot = await findProjectRoot()
+  const projectRoot = await ensureProjectRoot()
   const checks: DoctorCheck[] = []
 
   // ── node version ─────────────────────────────────────────
@@ -81,7 +82,7 @@ export async function runDoctor(): Promise<void> {
       fix: envExists ? undefined : 'Create a .env file at your project root',
     })
   } catch (err) {
-    spinner.fail('Detection failed')
+    spinner.stop('Detection failed')
     checks.push({
       name: 'Detection',
       status: 'fail',

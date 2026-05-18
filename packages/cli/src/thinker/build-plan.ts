@@ -66,6 +66,12 @@ export async function buildPlan(
         // don't fail the whole plan for one missing template
         content = undefined
       }
+
+      // ── strip 'use client' for non-Next.js environments ──────
+      if (content && framework !== 'nextjs') {
+        content = content.replace(/(^|\n)\s*['"]use client['"];?\s*/g, '$1')
+      }
+
       return {
         path: template.outputPath(ctx),
         templateKey: template.templateKey,
