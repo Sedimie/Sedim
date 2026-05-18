@@ -7,7 +7,7 @@ import { exists, readText } from '../shared/fs'
 import * as ui from '../showbaby/index'
 import { buildPlan } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
-import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
+import { loadPlanConfig } from '../thinker/load-plan-config'
 import { applyInjection } from '../writer/inject-code'
 
 export async function runDiff(moduleName: string): Promise<void> {
@@ -41,7 +41,7 @@ export async function runDiff(moduleName: string): Promise<void> {
 
   let plan: InstallPlan
   try {
-    const planConfig = manifestToPlanConfig(manifest, [], ctx)
+    const planConfig = await loadPlanConfig(moduleName, manifest, ctx, [])
     plan = await buildPlan(ctx, planConfig, [])
   } catch (err) {
     ui.showError(err)
