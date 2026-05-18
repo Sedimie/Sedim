@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { useState, type FormEvent } from 'react'
 import { login } from './auth-client'
 import type { AuthError } from './auth-client'
@@ -50,6 +51,7 @@ const s = {
 export function LoginForm({ onSuccess, onTotpRequired, onError, redirectTo }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<AuthError | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -72,9 +74,17 @@ export function LoginForm({ onSuccess, onTotpRequired, onError, redirectTo }: Lo
           required autoComplete="email" disabled={loading} style={s.input} placeholder="you@example.com" />
       </div>
       <div style={s.field}>
-        <label htmlFor="login-password" style={s.label}>Password</label>
-        <input id="login-password" type="password" value={password} onChange={e => setPassword(e.target.value)}
-          required autoComplete="current-password" disabled={loading} style={s.input} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label htmlFor="login-password" style={s.label}>Password</label>
+          <a href="/forgot-password" style={{ fontSize: 'calc(var(--auth-font-size-sm) - 1px)', color: 'var(--auth-muted)', textDecoration: 'none' }}>Forgot password?</a>
+        </div>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input id="login-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+            required autoComplete="current-password" disabled={loading} style={{ ...s.input, paddingRight: '3rem' }} />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', color: 'var(--auth-muted)', cursor: 'pointer', fontSize: '12px' }}>
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
       </div>
       {error && <p role="alert" style={s.error}>{error === 'invalid-credentials' ? 'Invalid email or password.' : 'Something went wrong.'}</p>}
       <button type="submit" disabled={loading} style={{ ...s.button, opacity: loading ? 0.5 : 1 }}>
