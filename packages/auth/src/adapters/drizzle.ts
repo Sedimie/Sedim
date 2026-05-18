@@ -56,9 +56,10 @@ export interface AuthDrizzleSchema {
   }>
 }
 
-// Minimal Drizzle table interface — just what we need to call eq/insert/select
-// Using unknown for the full Drizzle generics avoids importing drizzle-orm here
-type DrizzleTable<_TShape> = Record<string, unknown>
+// Minimal Drizzle table interface — accepts any Drizzle table regardless of dialect.
+// The index signature makes it compatible with PgTableWithColumns, MySqlTable, etc.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleTable<_TShape> = Record<string, any>
 
 // Drizzle db client interface — the subset of methods we use
 interface DrizzleDb {

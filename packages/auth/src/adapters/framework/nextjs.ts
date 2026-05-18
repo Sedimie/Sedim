@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { hashSessionToken } from '../../core/generate-token.js'
-import type { User } from '../types.js'
-import type { Session } from '../../core/session.js'
-import type { AuthConfig } from './config.js'
-import { resolveConfig } from './config.js'
+import { hashSessionToken } from '../core/generate-token.js'
+import type { User } from './types.js'
+import type { Session } from '../core/session.js'
+import type { AuthConfig } from './framework-config.js'
+import { resolveConfig } from './framework-config.js'
 import {
   signupWithPassword,
   loginWithPassword,

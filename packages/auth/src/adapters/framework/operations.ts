@@ -1,11 +1,11 @@
-import { hashPassword, verifyPassword, needsRehash } from '../../core/hash-password.js'
-import { generateSessionToken, hashSessionToken, generateOtpToken, hashBackupCode } from '../../core/generate-token.js'
-import { buildSession, validateSession } from '../../core/session.js'
-import { generatePkcePair, buildAuthorizationUrl } from '../../core/pkce.js'
-import { verifyTotpCode } from '../../core/totp.js'
-import type { DatabaseAdapter, User } from '../types.js'
-import type { Session } from '../../core/session.js'
-import type { ResolvedAuthConfig, OAuthProfile } from './config.js'
+import { hashPassword, verifyPassword, needsRehash } from '../core/hash-password.js'
+import { generateSessionToken, hashSessionToken, generateOtpToken, hashBackupCode } from '../core/generate-token.js'
+import { buildSession, validateSession } from '../core/session.js'
+import { generatePkcePair, buildAuthorizationUrl } from '../core/pkce.js'
+import { verifyTotpCode } from '../core/totp.js'
+import type { DatabaseAdapter, User } from './types.js'
+import type { Session } from '../core/session.js'
+import type { ResolvedAuthConfig, OAuthProfile } from './framework-config.js'
 
 // ── Result types ──────────────────────────────────────────────
 

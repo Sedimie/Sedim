@@ -23,6 +23,9 @@ export function createAuthPlanConfig(
 
   // ── unsupported stack — surface clearly ───────────────────
   const unsupportedReasons: string[] = []
+  if (ctx.language.value === 'javascript') {
+    unsupportedReasons.push('JavaScript-only projects are not yet supported. Auth requires TypeScript.')
+  }
   if (framework === 'fastify') unsupportedReasons.push('Fastify adapter not yet supported — coming in v1.1')
   if (framework === 'unknown') unsupportedReasons.push('Framework could not be detected. Run sedim init first.')
   if (orm === 'none') unsupportedReasons.push('No ORM detected. Auth requires Drizzle or Prisma.')
@@ -94,8 +97,9 @@ export function createAuthPlanConfig(
   if (orm === 'drizzle') {
     const db = ctx.db.value
     const dialect = db === 'mysql' ? 'mysql' : db === 'sqlite' ? 'sqlite' : 'pg'
+    const schemaKey = dialect === 'pg' ? 'auth/schema/drizzle' : `auth/schema/drizzle-${dialect}`
     templates.push({
-      templateKey: `auth/schema/drizzle-${dialect}`,
+      templateKey: schemaKey,
       outputPath: () => `${authDir}/schema.ts`,
       overwriteStrategy: 'skip',
     })
@@ -128,38 +132,79 @@ export function createAuthPlanConfig(
     }
   }
 
-  // framework adapter
+  // framework adapter — stamp the right framework file + its dependencies
   templates.push({
     templateKey: `auth/adapters/framework/${framework}`,
     outputPath: () => `${authDir}/adapters/framework.ts`,
     overwriteStrategy: 'skip',
   })
-
-  // config file — user edits this to set db adapter, providers, secret
+  // config and operations are imported by the framework adapter — must be stamped too
   templates.push({
-    templateKey: `auth/config`,
-    outputPath: () => `${authDir}/config.ts`,
-    overwriteStrategy: 'ask', // ask because user may have customised it
+    templateKey: 'auth/adapters/framework/framework-config',
+    outputPath: () => `${authDir}/adapters/framework-config.ts`,
+    overwriteStrategy: 'skip',
+  })
+  templates.push({
+    templateKey: 'auth/adapters/framework/operations',
+    outputPath: () => `${authDir}/adapters/operations.ts`,
+    overwriteStrategy: 'skip',
   })
 
-  // barrel index — re-exports what the user needs to import
+  // config file — user edits this to wire their db + providers
   templates.push({
-    templateKey: 'auth/index',
+    templateKey: 'auth/templates/config',
+    outputPath: () => `${authDir}/config.ts`,
+    overwriteStrategy: 'ask',
+  })
+
+  // barrel index
+  templates.push({
+    templateKey: 'auth/templates/index',
     outputPath: () => `${authDir}/index.ts`,
     overwriteStrategy: 'skip',
   })
 
-  // Next.js: route handler and middleware are new files — no existing file touched
+  // DB adapter wiring file — one level above sedim/auth
+  templates.push({
+    templateKey: `auth/templates/adapter/${orm}`,
+    outputPath: () => `${src}/sedim/auth-adapter.ts`,
+    overwriteStrategy: 'ask',
+  })
+
+  // Next.js: new files only — no existing file touched
   if (framework === 'nextjs') {
     templates.push({
-      templateKey: 'auth/routes/nextjs',
+      templateKey: 'auth/templates/routes/nextjs',
       outputPath: () => `${src}/app/api/auth/[...all]/route.ts`,
       overwriteStrategy: 'ask',
     })
     templates.push({
-      templateKey: 'auth/middleware/nextjs',
+      templateKey: 'auth/templates/middleware/nextjs',
       outputPath: () => 'middleware.ts',
       overwriteStrategy: 'ask',
+    })
+  }
+
+  // Express: router + middleware inside sedim/auth
+  if (framework === 'express') {
+    templates.push({
+      templateKey: 'auth/templates/routes/express',
+      outputPath: () => `${authDir}/router.ts`,
+      overwriteStrategy: 'skip',
+    })
+    templates.push({
+      templateKey: 'auth/templates/middleware/express',
+      outputPath: () => `${authDir}/middleware.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // Hono: routes inside sedim/auth
+  if (framework === 'hono') {
+    templates.push({
+      templateKey: 'auth/templates/routes/hono',
+      outputPath: () => `${authDir}/routes.ts`,
+      overwriteStrategy: 'skip',
     })
   }
 
@@ -234,6 +279,7 @@ export function createAuthPlanConfig(
       key: 'APP_URL',
       description: 'Your app public base URL. Used for OAuth redirect URIs and email links.',
       example: 'https://yourdomain.com',
+      default: 'http://localhost:3000',
       required: true,
     },
   ]
@@ -259,7 +305,7 @@ export function createAuthPlanConfig(
   if (features.includes('magic-link') || features.includes('email-password')) {
     envVars.push(
       { key: 'SMTP_HOST', description: 'SMTP server hostname (e.g. smtp.resend.com)', required: true },
-      { key: 'SMTP_PORT', description: 'SMTP port — 587 for TLS, 465 for SSL', example: '587', required: true },
+      { key: 'SMTP_PORT', description: 'SMTP port — 587 for TLS, 465 for SSL', example: '587', default: '587', required: true },
       { key: 'SMTP_USER', description: 'SMTP username', required: true },
       { key: 'SMTP_PASS', description: 'SMTP password or API key', required: true },
       { key: 'SMTP_FROM', description: 'From address for auth emails', example: 'auth@yourdomain.com', required: true },
