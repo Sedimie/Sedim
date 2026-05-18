@@ -3,94 +3,159 @@ import { getRequiredTables } from './schema/index.js'
 import type { AuthFeature } from './schema/index.js'
 
 // ── Auth PlanConfig ───────────────────────────────────────────
-// This is what the CLI thinker consumes to build an InstallPlan.
-// It replaces the generic manifestToPlanConfig for the auth module.
-//
-// Called by: sedim add auth (via the add command's plan-config loader)
-// Receives:  DetectedContext (what the detector found) + selectedFeatures
-// Returns:   PlanConfig (what to stamp, inject, install, and configure)
+// Stamping model:
+//   - All auth files land under src/sedim/auth/ — user owns them, can edit freely
+//   - Minimal injections into existing user files:
+//       Next.js: stamp new files only (route handler + middleware) — no existing file touched
+//       Express/Hono: one import + one mount line in their entry file
+//   - Schema lands at src/sedim/auth/schema.ts — user adds it to their schema barrel
+//   - User never has to hunt across their project to find auth code
 
 export function createAuthPlanConfig(
   ctx: DetectedContext,
   selectedFeatures: string[],
 ): PlanConfig {
   const src = ctx.structure.srcDir ?? 'src'
+  const authDir = `${src}/sedim/auth`
   const framework = ctx.framework.value
   const orm = ctx.orm.value
   const features = selectedFeatures as AuthFeature[]
 
-  // ── unsupported stack — surface clearly rather than silently failing ──
+  // ── unsupported stack — surface clearly ───────────────────
   const unsupportedReasons: string[] = []
   if (framework === 'fastify') unsupportedReasons.push('Fastify adapter not yet supported — coming in v1.1')
   if (framework === 'unknown') unsupportedReasons.push('Framework could not be detected. Run sedim init first.')
   if (orm === 'none') unsupportedReasons.push('No ORM detected. Auth requires Drizzle or Prisma.')
   if (orm === 'unknown') unsupportedReasons.push('ORM could not be detected. Run sedim init first.')
-  if (orm !== 'drizzle' && orm !== 'prisma') unsupportedReasons.push(`ORM "${orm}" is not supported yet. Use Drizzle or Prisma.`)
+  if (orm !== 'drizzle' && orm !== 'prisma') {
+    unsupportedReasons.push(`ORM "${orm}" is not supported yet. Use Drizzle or Prisma.`)
+  }
 
-  // ── schema tables — only what selected features actually need ─────────
+  // ── schema tables — only what selected features need ──────
   const schemaTables = getRequiredTables(features)
 
-  // ── template keys and output paths ───────────────────────────────────
-  // templateKey maps to a file in packages/auth/src/templates/
-  // outputPath is where it lands in the user's project
-
+  // ── templates — all land under src/sedim/auth/ ────────────
   const templates: PlanConfig['templates'] = []
 
-  // auth config — always stamped, framework-specific
+  // core logic files — always stamped
   templates.push({
-    templateKey: `auth/config/${framework}`,
-    outputPath: () => `${src}/lib/auth.ts`,
-    overwriteStrategy: 'ask',
+    templateKey: 'auth/core/hash-password',
+    outputPath: () => `${authDir}/core/hash-password.ts`,
+    overwriteStrategy: 'skip', // never overwrite — user may have customised
+  })
+  templates.push({
+    templateKey: 'auth/core/generate-token',
+    outputPath: () => `${authDir}/core/generate-token.ts`,
+    overwriteStrategy: 'skip',
+  })
+  templates.push({
+    templateKey: 'auth/core/session',
+    outputPath: () => `${authDir}/core/session.ts`,
+    overwriteStrategy: 'skip',
+  })
+  if (features.some(f => f.startsWith('oauth-'))) {
+    templates.push({
+      templateKey: 'auth/core/pkce',
+      outputPath: () => `${authDir}/core/pkce.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+  if (features.includes('totp')) {
+    templates.push({
+      templateKey: 'auth/core/totp',
+      outputPath: () => `${authDir}/core/totp.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // adapter types — always stamped
+  templates.push({
+    templateKey: 'auth/adapters/types',
+    outputPath: () => `${authDir}/adapters/types.ts`,
+    overwriteStrategy: 'skip',
   })
 
-  // schema — ORM and DB dialect specific
+  // ORM adapter
+  if (orm === 'drizzle') {
+    templates.push({
+      templateKey: 'auth/adapters/drizzle',
+      outputPath: () => `${authDir}/adapters/drizzle.ts`,
+      overwriteStrategy: 'skip',
+    })
+  } else if (orm === 'prisma') {
+    templates.push({
+      templateKey: 'auth/adapters/prisma',
+      outputPath: () => `${authDir}/adapters/prisma.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // schema — lands in sedim/auth, not in user's db/schema
   if (orm === 'drizzle') {
     const db = ctx.db.value
     const dialect = db === 'mysql' ? 'mysql' : db === 'sqlite' ? 'sqlite' : 'pg'
     templates.push({
       templateKey: `auth/schema/drizzle-${dialect}`,
-      outputPath: () => `${src}/db/schema/auth.ts`,
-      overwriteStrategy: 'ask',
+      outputPath: () => `${authDir}/schema.ts`,
+      overwriteStrategy: 'skip',
     })
   } else if (orm === 'prisma') {
-    // prisma stamps model blocks — handled as injection into schema.prisma
-    // base models always needed
     templates.push({
       templateKey: 'auth/schema/prisma-base',
-      outputPath: () => 'prisma/auth.prisma',
-      overwriteStrategy: 'ask',
+      outputPath: () => `${authDir}/schema.prisma`,
+      overwriteStrategy: 'skip',
     })
     if (features.some(f => ['magic-link', 'email-verification', 'password-reset'].includes(f))) {
       templates.push({
         templateKey: 'auth/schema/prisma-otp',
-        outputPath: () => 'prisma/auth-otp.prisma',
-        overwriteStrategy: 'ask',
+        outputPath: () => `${authDir}/schema-otp.prisma`,
+        overwriteStrategy: 'skip',
       })
     }
-    if (features.includes('oauth-google') || features.includes('oauth-github') || features.includes('oauth-discord')) {
+    if (features.some(f => f.startsWith('oauth-'))) {
       templates.push({
         templateKey: 'auth/schema/prisma-oauth',
-        outputPath: () => 'prisma/auth-oauth.prisma',
-        overwriteStrategy: 'ask',
+        outputPath: () => `${authDir}/schema-oauth.prisma`,
+        overwriteStrategy: 'skip',
       })
     }
     if (features.includes('totp')) {
       templates.push({
         templateKey: 'auth/schema/prisma-totp',
-        outputPath: () => 'prisma/auth-totp.prisma',
-        overwriteStrategy: 'ask',
+        outputPath: () => `${authDir}/schema-totp.prisma`,
+        overwriteStrategy: 'skip',
       })
     }
   }
 
-  // Next.js — route handler at app/api/auth/[...all]/route.ts
+  // framework adapter
+  templates.push({
+    templateKey: `auth/adapters/framework/${framework}`,
+    outputPath: () => `${authDir}/adapters/framework.ts`,
+    overwriteStrategy: 'skip',
+  })
+
+  // config file — user edits this to set db adapter, providers, secret
+  templates.push({
+    templateKey: `auth/config`,
+    outputPath: () => `${authDir}/config.ts`,
+    overwriteStrategy: 'ask', // ask because user may have customised it
+  })
+
+  // barrel index — re-exports what the user needs to import
+  templates.push({
+    templateKey: 'auth/index',
+    outputPath: () => `${authDir}/index.ts`,
+    overwriteStrategy: 'skip',
+  })
+
+  // Next.js: route handler and middleware are new files — no existing file touched
   if (framework === 'nextjs') {
     templates.push({
       templateKey: 'auth/routes/nextjs',
       outputPath: () => `${src}/app/api/auth/[...all]/route.ts`,
       overwriteStrategy: 'ask',
     })
-    // middleware.ts for session-based route protection
     templates.push({
       templateKey: 'auth/middleware/nextjs',
       outputPath: () => 'middleware.ts',
@@ -98,42 +163,22 @@ export function createAuthPlanConfig(
     })
   }
 
-  // Express — router file
-  if (framework === 'express') {
-    templates.push({
-      templateKey: 'auth/routes/express',
-      outputPath: () => `${src}/auth/router.ts`,
-      overwriteStrategy: 'ask',
-    })
-    templates.push({
-      templateKey: 'auth/middleware/express',
-      outputPath: () => `${src}/auth/middleware.ts`,
-      overwriteStrategy: 'ask',
-    })
-  }
-
-  // Hono — routes file
-  if (framework === 'hono') {
-    templates.push({
-      templateKey: 'auth/routes/hono',
-      outputPath: () => `${src}/auth/routes.ts`,
-      overwriteStrategy: 'ask',
-    })
-  }
-
-  // DB adapter wiring file — always stamped, tells user how to wire it up
-  templates.push({
-    templateKey: `auth/adapter/${orm}`,
-    outputPath: () => `${src}/lib/auth-adapter.ts`,
-    overwriteStrategy: 'ask',
-  })
-
-  // ── injections ────────────────────────────────────────────────────────
-
+  // ── injections — minimal, only where unavoidable ──────────
   const injections: PlanConfig['injections'] = []
 
-  // Express: inject auth router into the app entry file
+  // Express: one import + one mount in entry file — unavoidable
   if (framework === 'express') {
+    injections.push({
+      type: 'import',
+      target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
+      variants: {
+        express: {
+          payload: `import { authRouter } from './sedim/auth'`,
+          anchor: `import`,
+          position: 'after',
+        },
+      },
+    })
     injections.push({
       type: 'route',
       target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
@@ -145,21 +190,21 @@ export function createAuthPlanConfig(
         },
       },
     })
+  }
+
+  // Hono: one import + one mount in entry file — unavoidable
+  if (framework === 'hono') {
     injections.push({
       type: 'import',
       target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
       variants: {
-        express: {
-          payload: `import { authRouter } from './auth/router'`,
+        hono: {
+          payload: `import { authRoutes } from './sedim/auth'`,
           anchor: `import`,
           position: 'after',
         },
       },
     })
-  }
-
-  // Hono: inject auth routes into the app entry file
-  if (framework === 'hono') {
     injections.push({
       type: 'route',
       target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
@@ -171,32 +216,13 @@ export function createAuthPlanConfig(
         },
       },
     })
-    injections.push({
-      type: 'import',
-      target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
-      variants: {
-        hono: {
-          payload: `import { authRoutes } from './auth/routes'`,
-          anchor: `import`,
-          position: 'after',
-        },
-      },
-    })
   }
 
-  // ── dependencies ──────────────────────────────────────────────────────
+  // ── dependencies ──────────────────────────────────────────
+  const dependencies = ['argon2', '@oslojs/crypto', '@oslojs/encoding']
+  if (features.some(f => f.startsWith('oauth-'))) dependencies.push('@oslojs/oauth2')
 
-  const dependencies = [
-    'argon2',
-    '@oslojs/crypto',
-    '@oslojs/encoding',
-  ]
-
-  const hasOAuth = features.some(f => f.startsWith('oauth-'))
-  if (hasOAuth) dependencies.push('@oslojs/oauth2')
-
-  // ── env vars — filtered by selected features ──────────────────────────
-
+  // ── env vars — filtered by selected features ──────────────
   const envVars: PlanConfig['envVars'] = [
     {
       key: 'AUTH_SECRET',
@@ -240,10 +266,6 @@ export function createAuthPlanConfig(
     )
   }
 
-  // ── conflict hints for unsupported stacks ─────────────────────────────
-
-  const peerContracts: PlanConfig['peerContracts'] = []
-
   return {
     moduleName: 'auth',
     version: '0.1.0',
@@ -253,8 +275,7 @@ export function createAuthPlanConfig(
     devDependencies: [],
     envVars,
     schemaTables,
-    peerContracts,
-    // attach unsupported reasons so the thinker can surface them
+    peerContracts: [],
     ...(unsupportedReasons.length > 0 ? { _unsupportedReasons: unsupportedReasons } : {}),
   } as PlanConfig
 }
