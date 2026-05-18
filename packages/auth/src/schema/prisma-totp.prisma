@@ -1,0 +1,22 @@
+// ── TOTP credentials + backup codes ──────────────────────────
+// Stamped when totp feature is selected.
+// Also add `totpCredential TotpCredential?` and `backupCodes BackupCode[]`
+// to your User model relations.
+
+model TotpCredential {
+  userId          String   @id
+  secret          String
+  lastUsedCounter Int?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BackupCode {
+  id       String    @id @default(cuid())
+  userId   String
+  codeHash String
+  usedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

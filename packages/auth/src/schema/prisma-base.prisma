@@ -1,0 +1,23 @@
+// ── Base auth models (always required) ───────────────────────
+// Stamped for every auth install regardless of selected features.
+// If you already have a User model, skip this block and ensure your
+// model has: id, email (unique), emailVerified (Boolean), passwordHash (String?), createdAt
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  passwordHash  String?
+  createdAt     DateTime @default(now())
+
+  sessions Session[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  fresh     Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

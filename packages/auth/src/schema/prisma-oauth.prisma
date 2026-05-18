@@ -1,0 +1,13 @@
+// ── OAuth accounts ────────────────────────────────────────────
+// Stamped when oauth feature is selected.
+// Also add `oauthAccounts OAuthAccount[]` to your User model relations.
+
+model OAuthAccount {
+  providerId     String
+  providerUserId String
+  userId         String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([providerId, providerUserId])
+}

@@ -1,0 +1,19 @@
+// ── OTP tokens (magic-link, email-verification, password-reset) ──
+// Stamped when any of those features are selected.
+// Also add `otpTokens OtpToken[]` to your User model relations.
+
+model OtpToken {
+  id        String       @id @default(cuid())
+  userId    String
+  tokenHash String       @unique
+  type      OtpTokenType
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum OtpTokenType {
+  MAGIC_LINK
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
