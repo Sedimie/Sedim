@@ -1,0 +1,154 @@
+{
+  "name": "auth",
+  "version": "0.1.0",
+  "layers": {
+    "protocol": ["http-cookies", "oauth-redirect", "magic-link", "totp"],
+    "logic": ["password-hash", "session-token", "pkce", "totp", "backup-codes"],
+    "persistence": {
+      "tables": [
+        "users",
+        "sessions",
+        "otp_tokens",
+        "oauth_accounts",
+        "totp_credentials",
+        "backup_codes"
+      ],
+      "requires": []
+    },
+    "contract": {
+      "types": "./src/adapters/types.ts"
+    },
+    "adapter": {
+      "frameworks": ["nextjs", "express", "hono"],
+      "orms": ["drizzle", "prisma"]
+    },
+    "delivery": {
+      "stamps": ["schema", "config", "routes", "middleware"]
+    },
+    "ui": {
+      "headless": true,
+      "tailwind": true,
+      "themes": ["minimal", "enterprise"]
+    }
+  },
+  "features": {
+    "providers": [
+      "email-password",
+      "magic-link",
+      "oauth-google",
+      "oauth-github",
+      "oauth-discord",
+      "totp"
+    ],
+    "ui": ["headless", "tailwind", "themed"]
+  },
+  "requires": {
+    "envVars": [
+      "AUTH_SECRET",
+      "DATABASE_URL",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "DISCORD_CLIENT_ID",
+      "DISCORD_CLIENT_SECRET",
+      "SMTP_HOST",
+      "SMTP_PORT",
+      "SMTP_USER",
+      "SMTP_PASS",
+      "SMTP_FROM",
+      "APP_URL"
+    ],
+    "peerModules": []
+  },
+  "envVarMeta": {
+    "AUTH_SECRET": {
+      "description": "Random secret used to sign session tokens. Min 32 characters.",
+      "example": "openssl rand -hex 32",
+      "required": true,
+      "requiredFor": ["email-password", "magic-link", "oauth-google", "oauth-github", "oauth-discord", "totp"]
+    },
+    "DATABASE_URL": {
+      "description": "Database connection string.",
+      "example": "postgresql://user:password@localhost:5432/mydb",
+      "required": true,
+      "requiredFor": ["email-password", "magic-link", "oauth-google", "oauth-github", "oauth-discord", "totp"]
+    },
+    "GOOGLE_CLIENT_ID": {
+      "description": "Google OAuth app client ID. Get it from console.cloud.google.com.",
+      "example": "123456789-abc.apps.googleusercontent.com",
+      "required": false,
+      "requiredFor": ["oauth-google"]
+    },
+    "GOOGLE_CLIENT_SECRET": {
+      "description": "Google OAuth app client secret.",
+      "example": "GOCSPX-...",
+      "required": false,
+      "requiredFor": ["oauth-google"]
+    },
+    "GITHUB_CLIENT_ID": {
+      "description": "GitHub OAuth app client ID. Get it from github.com/settings/developers.",
+      "example": "Iv1.abc123",
+      "required": false,
+      "requiredFor": ["oauth-github"]
+    },
+    "GITHUB_CLIENT_SECRET": {
+      "description": "GitHub OAuth app client secret.",
+      "example": "abc123...",
+      "required": false,
+      "requiredFor": ["oauth-github"]
+    },
+    "DISCORD_CLIENT_ID": {
+      "description": "Discord OAuth app client ID. Get it from discord.com/developers.",
+      "example": "123456789012345678",
+      "required": false,
+      "requiredFor": ["oauth-discord"]
+    },
+    "DISCORD_CLIENT_SECRET": {
+      "description": "Discord OAuth app client secret.",
+      "example": "abc123...",
+      "required": false,
+      "requiredFor": ["oauth-discord"]
+    },
+    "SMTP_HOST": {
+      "description": "SMTP server hostname for sending magic link and verification emails.",
+      "example": "smtp.resend.com",
+      "required": false,
+      "requiredFor": ["magic-link", "email-password"]
+    },
+    "SMTP_PORT": {
+      "description": "SMTP server port. 465 for SSL, 587 for TLS.",
+      "example": "587",
+      "required": false,
+      "requiredFor": ["magic-link", "email-password"]
+    },
+    "SMTP_USER": {
+      "description": "SMTP authentication username.",
+      "example": "resend",
+      "required": false,
+      "requiredFor": ["magic-link", "email-password"]
+    },
+    "SMTP_PASS": {
+      "description": "SMTP authentication password or API key.",
+      "example": "re_abc123...",
+      "required": false,
+      "requiredFor": ["magic-link", "email-password"]
+    },
+    "SMTP_FROM": {
+      "description": "The from address for auth emails.",
+      "example": "auth@yourdomain.com",
+      "required": false,
+      "requiredFor": ["magic-link", "email-password"]
+    },
+    "APP_URL": {
+      "description": "Your app's public base URL. Used to build OAuth redirect URIs and email links.",
+      "example": "https://yourdomain.com",
+      "required": true,
+      "requiredFor": ["magic-link", "oauth-google", "oauth-github", "oauth-discord"]
+    }
+  },
+  "adapters": {
+    "frameworks": ["nextjs", "express", "hono"],
+    "orms": ["drizzle", "prisma"]
+  }
+}

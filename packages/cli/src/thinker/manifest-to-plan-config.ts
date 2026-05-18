@@ -1,24 +1,36 @@
 import type { DetectedContext, ModuleManifest, PlanConfig } from '../planning/types'
 
-// converts a ModuleManifest (from registry) into a PlanConfig (for the thinker)
-// this is a generic best-effort conversion used until a module ships
-// its own plan-config.ts with framework-specific logic
-//
-// real modules override this by providing their own PlanConfig directly
-// e.g. modules/auth/plan-config.ts returns a fully typed PlanConfig
-// with proper outputPath functions and injection variants
-
 export function manifestToPlanConfig(
   manifest: ModuleManifest,
   selectedFeatures: string[],
   _ctx: DetectedContext,
 ): PlanConfig {
+  // filter env vars to only those relevant to selected features
+  // if envVarMeta exists, use it for descriptions and filtering
+  // otherwise fall back to requiring all declared env vars
+  const envVars = manifest.requires.envVars
+    .filter(key => {
+      const meta = manifest.envVarMeta?.[key]
+      if (!meta) return true // no metadata — always include
+      if (meta.required) return true // always required regardless of features
+      if (!meta.requiredFor || meta.requiredFor.length === 0) return true
+      // include if any selected feature needs this var
+      return meta.requiredFor.some(f => selectedFeatures.includes(f))
+    })
+    .map(key => {
+      const meta = manifest.envVarMeta?.[key]
+      return {
+        key,
+        description: meta?.description ?? `Required by ${manifest.name} module`,
+        example: meta?.example,
+        required: meta?.required ?? true,
+      }
+    })
+
   return {
     moduleName: manifest.name,
     version: manifest.version,
 
-    // generic templates — real modules provide proper outputPath functions
-    // these are placeholders until the module ships its own plan-config
     templates: manifest.layers.delivery.stamps.map(stamp => ({
       templateKey: `${manifest.name}/${stamp}`,
       outputPath: (ctx: DetectedContext) => {
@@ -28,18 +40,12 @@ export function manifestToPlanConfig(
       overwriteStrategy: 'ask' as const,
     })),
 
-    // no injections from manifest alone — modules must provide these
-    // in their own plan-config.ts with framework-specific variants
     injections: [],
 
-    dependencies: manifest.requires.envVars.length > 0 ? [] : [],
+    dependencies: [],
     devDependencies: [],
 
-    envVars: manifest.requires.envVars.map(key => ({
-      key,
-      description: `Required by ${manifest.name} module`,
-      required: true,
-    })),
+    envVars,
 
     schemaTables: manifest.layers.persistence.tables,
 

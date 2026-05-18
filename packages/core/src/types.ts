@@ -176,6 +176,14 @@ export interface ModuleManifest {
     envVars: string[]
     peerModules: string[]
   }
+  /** Per-env-var metadata — used by the CLI to show descriptions and filter by selected features */
+  envVarMeta?: Record<string, {
+    description: string
+    example?: string
+    required: boolean
+    /** Only prompt for this var if one of these features was selected */
+    requiredFor?: string[]
+  }>
   adapters: {
     frameworks: Framework[]
     orms: ORM[]
