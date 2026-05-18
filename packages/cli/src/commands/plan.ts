@@ -1,5 +1,6 @@
 import { isSedimInitialised } from '../config/index'
 import { detect } from '../detector/index'
+import { verifyAndOverrideDetection } from '../detector/override'
 import { renderPlanSummary } from '../planning/diff-renderer'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { ensureProjectRoot } from '../shared/ensure-project'
@@ -29,13 +30,16 @@ export async function runPlan(moduleName: string): Promise<void> {
     process.exit(1)
   }
 
+  ui.showDetectionSummary(ctx)
+  ctx = await verifyAndOverrideDetection(ctx)
+
   let manifest: ModuleManifest
   const manifestSpinner = ui.createSpinner(`Fetching ${moduleName} manifest...`)
   try {
     manifest = await loadModuleManifest(moduleName)
     manifestSpinner.stop('Manifest loaded')
   } catch (err) {
-    manifestSpinner.fail('Failed to load manifest')
+    manifestSpinner.stop('Failed to load manifest')
     ui.showError(err)
     process.exit(1)
   }
@@ -49,13 +53,13 @@ export async function runPlan(moduleName: string): Promise<void> {
     plan = await buildPlan(ctx, planConfig, [])
     planSpinner.stop('Plan ready')
   } catch (err) {
-    planSpinner.fail('Planning failed')
+    planSpinner.stop('Planning failed')
     ui.showError(err)
     process.exit(1)
   }
 
   // surface unsupported stack warnings — plan still shows so user can see what would happen
-  const unsupported = (planConfig as Record<string, unknown>)['_unsupportedReasons'] as
+  const unsupported = (planConfig as unknown as Record<string, unknown>)['_unsupportedReasons'] as
     | string[]
     | undefined
   if (unsupported?.length) {

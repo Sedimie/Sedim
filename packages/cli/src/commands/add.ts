@@ -1,5 +1,6 @@
 import { isSedimInitialised, readSedimConfig } from '../config/index'
 import { detect } from '../detector/index'
+import { verifyAndOverrideDetection } from '../detector/override'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { readSession, writeSession } from '../session/index'
 import { ensureProjectRoot } from '../shared/ensure-project'
@@ -10,6 +11,7 @@ import { buildPlan } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { loadPlanConfig } from '../thinker/load-plan-config'
 import { applyPlan } from '../writer/index'
+import { runContinue } from './continue'
 
 export async function runAdd(
   moduleName: string,
@@ -35,9 +37,8 @@ export async function runAdd(
       true,
     )
     if (resume) {
-      ui.logInfo('Run `sedim continue` to resume the interrupted install.')
-      ui.showOutro('Use `sedim continue` to pick up where you left off.')
-      return
+      ui.logInfo('Resuming session automatically...')
+      return runContinue(moduleName)
     }
     // user chose not to resume — clear the stale session and start fresh
     const { clearSession } = await import('../session/index.js')
@@ -59,6 +60,7 @@ export async function runAdd(
   }
 
   ui.showDetectionSummary(ctx)
+  ctx = await verifyAndOverrideDetection(ctx)
 
   // ── load manifest ────────────────────────────────────────
   ui.logSection('Module')
@@ -69,7 +71,7 @@ export async function runAdd(
     manifest = await loadModuleManifest(moduleName)
     manifestSpinner.stop(`${moduleName} manifest loaded`)
   } catch (err) {
-    manifestSpinner.fail('Failed to load manifest')
+    manifestSpinner.stop('Failed to load manifest')
     ui.showError(err)
     process.exit(1)
   }
@@ -112,6 +114,14 @@ export async function runAdd(
         hint: uiLabels[u]?.hint,
       })),
     )
+
+    if (selections.ui === 'themed') {
+      selections.themeVariant = await ui.select('Which theme variant?', [
+        { value: 'modern', label: 'Modern', hint: 'Glassmorphism & Gradients' },
+        { value: 'minimal', label: 'Minimal', hint: 'Neumorphism & Soft UI' },
+        { value: 'colorful', label: 'Colorful', hint: 'Neubrutalism' },
+      ])
+    }
   }
 
   if (manifest.features.authorization?.length) {
@@ -129,6 +139,7 @@ export async function runAdd(
   const selectedFeatures = [
     ...((selections.providers as string[]) ?? []),
     ...((selections.ui as string[]) ? [selections.ui as string] : []),
+    ...((selections.themeVariant as string[]) ? [selections.themeVariant as string] : []),
     ...((selections.authorization as string[]) ? [selections.authorization as string] : []),
   ]
 
@@ -141,13 +152,13 @@ export async function runAdd(
     plan = await buildPlan(ctx, planConfig, selectedFeatures)
     planSpinner.stop('Plan ready')
   } catch (err) {
-    planSpinner.fail('Planning failed')
+    planSpinner.stop('Planning failed')
     ui.showError(err)
     process.exit(1)
   }
 
   // surface unsupported stack warnings before showing the plan
-  const unsupported = (planConfig as Record<string, unknown>)['_unsupportedReasons'] as
+  const unsupported = (planConfig as unknown as Record<string, unknown>)['_unsupportedReasons'] as
     | string[]
     | undefined
   if (unsupported?.length) {
@@ -196,6 +207,22 @@ export async function runAdd(
   const proceed = await ui.confirm('Apply this plan?', true)
   if (!proceed) {
     ui.showCancel('Cancelled — no files written.')
+    process.exit(0)
+  }
+
+  // ── collect env var values interactively ─────────────────
+  // only prompt for vars that aren't already set in .env
+  let collectedEnvValues = new Map<string, string>()
+  if (plan.envVarsToAdd.length > 0) {
+    ui.logSection('Environment Variables')
+    // build full config with required/default metadata from planConfig
+    const envVarMeta = new Map((planConfig.envVars ?? []).map(v => [v.key, v]))
+    const envVarsWithMeta = plan.envVarsToAdd.map(v => ({
+      ...v,
+      required: envVarMeta.get(v.key)?.required ?? true,
+      default: envVarMeta.get(v.key)?.default,
+    }))
+    collectedEnvValues = await ui.collectEnvValues(envVarsWithMeta)
   }
 
   // ── save session before writing ──────────────────────────
@@ -259,7 +286,7 @@ export async function runAdd(
         enabled: plan.envVarsToAdd.length > 0,
         task: async () => {
           const { updateEnv } = await import('../writer/update-env.js')
-          await updateEnv(projectRoot, plan.envVarsToAdd)
+          await updateEnv(projectRoot, plan.envVarsToAdd, collectedEnvValues)
           return `${plan.envVarsToAdd.length} env var${plan.envVarsToAdd.length !== 1 ? 's' : ''} added`
         },
       },
@@ -283,6 +310,10 @@ export async function runAdd(
     filesModified: plan.filesToModify.map(f => f.path),
     status: 'success',
   })
+
+  // Clear session properly upon success so it doesn't prompt resume next time
+  const { clearSession } = await import('../session/index.js')
+  await clearSession(projectRoot)
 
   ui.showEndReport(plan, Date.now() - start)
   ui.showOutro(`${moduleName} installed.`)
