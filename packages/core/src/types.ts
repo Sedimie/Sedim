@@ -217,6 +217,8 @@ export interface EnvVarConfig {
   key: string
   description: string
   example?: string
+  /** Pre-filled default value stamped into .env. Use for non-secret values like APP_URL. */
+  default?: string
   required: boolean
 }
 
