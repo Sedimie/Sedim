@@ -2,16 +2,18 @@ import path from 'node:path'
 import { isSedimInitialised } from '../config/index'
 import { detect } from '../detector/index'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
-import { exists, findProjectRoot, readText } from '../shared/fs'
+import { ensureProjectRoot } from '../shared/ensure-project'
+import { exists, readText } from '../shared/fs'
 import * as ui from '../showbaby/index'
 import { buildPlan } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { manifestToPlanConfig } from '../thinker/manifest-to-plan-config'
+import { applyInjection } from '../writer/inject-code'
 
 export async function runDiff(moduleName: string): Promise<void> {
   ui.showIntro(`diff ${moduleName}`)
 
-  const projectRoot = await findProjectRoot()
+  const projectRoot = await ensureProjectRoot()
 
   if (!(await isSedimInitialised(projectRoot))) {
     ui.showError(new Error('Run `sedim init` first.'))
@@ -24,7 +26,7 @@ export async function runDiff(moduleName: string): Promise<void> {
     ctx = await detect(projectRoot)
     spinner.stop('Stack detected')
   } catch (err) {
-    spinner.fail('Detection failed')
+    spinner.stop('Detection failed')
     ui.showError(err)
     process.exit(1)
   }
@@ -55,12 +57,14 @@ export async function runDiff(moduleName: string): Promise<void> {
       const injections = plan.injectionActions.filter(a => a.file === file.path)
       let after = before
       for (const injection of injections) {
-        after = after.replace(
-          injection.anchor,
-          injection.position === 'after'
-            ? `${injection.anchor}\n${injection.payload}`
-            : `${injection.payload}\n${injection.anchor}`,
-        )
+        try {
+          after = applyInjection(after, injection)
+        } catch {
+          // If anchor fails, gracefully show it in the diff as a failure or skip.
+          ui.logWarn(
+            `Could not simulate injection in ${file.path} for diff preview (anchor not found)`,
+          )
+        }
       }
       ui.showDiff(file.path, before, after)
     }
