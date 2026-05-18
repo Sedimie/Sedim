@@ -1,14 +1,15 @@
 import path from 'node:path'
+import type { UserTableAnalysis } from '../detector/detect-auth-signals'
 import type { ConflictAction, ConflictLevel, DetectedContext } from '../planning/types'
 import { exists } from '../shared/fs'
 
 export interface ConflictResult {
   level: ConflictLevel
   actions: ConflictAction[]
+  /** Populated when a users table was found — used by plan-config to decide schema strategy */
+  userTableAnalysis?: UserTableAnalysis
 }
 
-// classifies conflicts between what the module wants to do
-// and what already exists in the project
 export async function classifyConflicts(
   projectRoot: string,
   ctx: DetectedContext,
@@ -29,10 +30,34 @@ export async function classifyConflicts(
     }
   }
 
-  // schema tables the module wants to create that already exist
+  // schema table conflicts
   const existingTables = ctx.schema.tables.map(t => t.toLowerCase())
+  const analysis = (ctx.schema as unknown as { userTableAnalysis?: UserTableAnalysis })
+    .userTableAnalysis
+
   for (const table of schemaTables) {
-    if (existingTables.includes(table.toLowerCase())) {
+    if (!existingTables.includes(table.toLowerCase())) continue
+
+    const isUserTable = table.toLowerCase() === 'users' || table.toLowerCase() === 'user'
+
+    if (isUserTable && analysis) {
+      if (analysis.status === 'compatible') {
+      } else if (analysis.status === 'needs-migration') {
+        actions.push({
+          file: `schema (table: ${table})`,
+          level: 'partial',
+          description: `Table "${table}" exists but is missing columns: ${analysis.missingColumns.join(', ')}. sedim will generate ALTER TABLE migrations to add them.`,
+          resolution: 'pending-user-choice',
+        })
+      } else if (analysis.status === 'incompatible') {
+        actions.push({
+          file: `schema (table: ${table})`,
+          level: 'full',
+          description: `Table "${table}" is incompatible: ${analysis.incompatibleReason ?? 'structural mismatch'}. Align your schema manually then re-run sedim add auth.`,
+          resolution: 'pending-user-choice',
+        })
+      }
+    } else {
       actions.push({
         file: `schema (table: ${table})`,
         level: 'partial',
@@ -42,7 +67,7 @@ export async function classifyConflicts(
     }
   }
 
-  // existing auth detected = always at least partial conflict for auth modules
+  // existing auth packages/files
   if (ctx.conflicts.existingAuthDetected) {
     for (const signal of ctx.conflicts.signals) {
       actions.push({
@@ -54,12 +79,11 @@ export async function classifyConflicts(
     }
   }
 
-  // level classification:
-  // full  = existing auth + files to modify (high risk of breaking things)
-  // partial = some files exist or schema conflicts
-  // none  = clean slate
-  const hasFullConflict = ctx.conflicts.existingAuthDetected && actions.length > 1
+  const hasFullConflict =
+    actions.some(a => a.level === 'full') ||
+    (ctx.conflicts.existingAuthDetected && actions.length > 1)
+
   const level: ConflictLevel = hasFullConflict ? 'full' : actions.length > 0 ? 'partial' : 'none'
 
-  return { level, actions }
+  return { level, actions, userTableAnalysis: analysis }
 }
