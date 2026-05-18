@@ -34,60 +34,88 @@ export async function resolveTemplate(
   const generatedKeys: Record<string, (f: string[], c: DetectedContext) => string> = {
     'ui/pages/login-page': f => buildLoginPage(f),
     'ui/pages/signup-page': f => buildSignupPage(f),
-    'ui/pages/forgot-password-page': () => buildForgotPage(),
-    'ui/pages/reset-password-page': () => buildResetPage(),
+    'ui/pages/forgot-password-page': f => buildForgotPage(f),
+    'ui/pages/reset-password-page': f => buildResetPage(f),
+    'db/client': (_f, c) => buildDbClientFile(c),
   }
   if (generatedKeys[relPath]) {
     return generatedKeys[relPath](selectedFeatures, ctx)
   }
 
+  let content: string
+
   // 1. explicit substitution template
   const templatePath = path.join(packageRoot, 'templates', `${relPath}.ts`)
   if (await exists(templatePath)) {
     const raw = await readText(templatePath)
-    return applySubstitutions(raw, ctx, selectedFeatures)
-  }
+    content = applySubstitutions(raw, ctx, selectedFeatures)
+  } else {
+    const templatePrismaPath = path.join(packageRoot, 'templates', `${relPath}.prisma`)
+    if (await exists(templatePrismaPath)) {
+      const raw = await readText(templatePrismaPath)
+      content = applySubstitutions(raw, ctx, selectedFeatures)
+    } else {
+      // 2. verbatim source file
+      const knownExts = ['.ts', '.tsx', '.css', '.prisma']
+      const hasExt = knownExts.some(e => relPath.endsWith(e))
 
-  const templatePrismaPath = path.join(packageRoot, 'templates', `${relPath}.prisma`)
-  if (await exists(templatePrismaPath)) {
-    const raw = await readText(templatePrismaPath)
-    return applySubstitutions(raw, ctx, selectedFeatures)
-  }
-
-  // 2. verbatim source file — apply substitutions if it lives inside templates/
-  // if relPath already has a file extension, try it directly first
-  const knownExts = ['.ts', '.tsx', '.css', '.prisma']
-  const hasExt = knownExts.some(e => relPath.endsWith(e))
-
-  if (hasExt) {
-    const sourcePath = path.join(packageRoot, relPath)
-    if (await exists(sourcePath)) {
-      return readText(sourcePath)
+      if (hasExt) {
+        const sourcePath = path.join(packageRoot, relPath)
+        if (await exists(sourcePath)) {
+          content = await readText(sourcePath)
+        } else {
+          content = ''
+        }
+      } else {
+        let found = false
+        content = ''
+        for (const ext of ['.ts', '.tsx', '.css']) {
+          const sourcePath = path.join(packageRoot, `${relPath}${ext}`)
+          if (await exists(sourcePath)) {
+            const raw = await readText(sourcePath)
+            const isTemplateFile = sourcePath.includes(`${path.sep}templates${path.sep}`)
+            content = isTemplateFile ? applySubstitutions(raw, ctx, selectedFeatures) : raw
+            found = true
+            break
+          }
+        }
+        if (!found) {
+          const sourcePrismaPath = path.join(packageRoot, `${relPath}.prisma`)
+          if (await exists(sourcePrismaPath)) {
+            content = await readText(sourcePrismaPath)
+          } else {
+            throw new Error(
+              `Template not found for key "${templateKey}". ` +
+                `Checked:\n  ${templatePath}\n  ${path.join(packageRoot, relPath)}.[ts|tsx|css]`,
+            )
+          }
+        }
+      }
     }
   }
 
-  // otherwise try appending each extension
-  for (const ext of ['.ts', '.tsx', '.css']) {
-    const sourcePath = path.join(packageRoot, `${relPath}${ext}`)
-    if (await exists(sourcePath)) {
-      const raw = await readText(sourcePath)
-      const isTemplateFile = sourcePath.includes(`${path.sep}templates${path.sep}`)
-      return isTemplateFile ? applySubstitutions(raw, ctx, selectedFeatures) : raw
-    }
+  // ── Strip .js extensions from relative imports ────────────
+  // Next.js (Turbopack/webpack) and other bundlers resolve imports
+  // literally — they won't map './foo.js' to './foo.ts'.
+  // Node ESM needs .js extensions; bundlers don't. Since stamped files
+  // live inside a bundler project, strip them.
+  // Only strip from relative imports (starting with ./ or ../) to avoid
+  // touching third-party package imports like 'drizzle-orm/neon-http'.
+  if (!relPath.endsWith('.css') && !relPath.endsWith('.prisma')) {
+    content = stripRelativeJsExtensions(content)
   }
 
-  const sourcePrismaPath = path.join(packageRoot, `${relPath}.prisma`)
-  if (await exists(sourcePrismaPath)) {
-    return readText(sourcePrismaPath)
-  }
-
-  throw new Error(
-    `Template not found for key "${templateKey}". ` +
-      `Checked:\n  ${templatePath}\n  ${path.join(packageRoot, relPath)}.[ts|tsx|css]`,
-  )
+  return content
 }
 
 // ── Substitution variables ────────────────────────────────────
+
+// Strips .js extensions from relative imports so bundlers (Next.js Turbopack,
+// Vite, webpack) can resolve them. Only touches imports starting with ./ or ../
+// to avoid breaking third-party package imports like 'drizzle-orm/neon-http'.
+function stripRelativeJsExtensions(content: string): string {
+  return content.replace(/(from\s+['"])(\.\.?\/[^'"]*?)\.js(['"])/g, '$1$2$3')
+}
 
 function applySubstitutions(
   content: string,
@@ -116,8 +144,8 @@ function applySubstitutions(
     // page content — generated based on selected features
     LOGIN_PAGE: buildLoginPage(selectedFeatures),
     SIGNUP_PAGE: buildSignupPage(selectedFeatures),
-    FORGOT_PAGE: buildForgotPage(),
-    RESET_PAGE: buildResetPage(),
+    FORGOT_PAGE: buildForgotPage(selectedFeatures),
+    RESET_PAGE: buildResetPage(selectedFeatures),
   }
 
   return content.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`)
@@ -219,73 +247,113 @@ function buildLoginPage(features: string[]): string {
     .filter(f => f.startsWith('oauth-'))
     .map(f => f.replace('oauth-', '')) as string[]
   const hasOAuth = oauthProviders.length > 0
+  const isThemed = features.includes('themed')
+  const themeVariant = features.find(f => ['modern', 'minimal', 'colorful'].includes(f)) ?? 'modern'
+
+  const borderColor = isThemed ? 'var(--auth-border)' : '#e5e7eb'
+  const mutedColor = isThemed ? 'var(--auth-muted)' : '#6b7280'
+  const fgColor = isThemed ? 'var(--auth-fg)' : 'inherit'
 
   const imports: string[] = ["'use client'", '']
   if (hasPassword) imports.push(`import { LoginForm } from '@/sedim/auth/ui/LoginForm'`)
   if (hasMagicLink) imports.push(`import { MagicLinkForm } from '@/sedim/auth/ui/MagicLinkForm'`)
   if (hasOAuth) imports.push(`import { OAuthButton } from '@/sedim/auth/ui/OAuthButton'`)
 
+  const divider = [
+    `      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>`,
+    `        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid ${borderColor}', margin: 0 }} />`,
+    `        <span style={{ color: '${mutedColor}', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 500 }}>or</span>`,
+    `        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid ${borderColor}', margin: 0 }} />`,
+    `      </div>`,
+  ].join('\n')
+
   const body: string[] = []
 
-  if (hasPassword) {
-    body.push(`      <LoginForm redirectTo="/dashboard" />`)
-  }
-
-  if (hasOAuth && (hasPassword || hasMagicLink)) {
-    body.push(
-      `      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '1rem 0' }}>`,
-    )
-    body.push(
-      `        <hr style={{ flex: 1 }} /><span style={{ color: '#6b7280', fontSize: '0.875rem' }}>or</span><hr style={{ flex: 1 }} />`,
-    )
-    body.push(`      </div>`)
-  }
-
   if (hasOAuth) {
-    body.push(`      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>`)
+    body.push(`      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>`)
     for (const p of oauthProviders) {
       body.push(`        <OAuthButton provider="${p}" />`)
     }
     body.push(`      </div>`)
   }
 
+  if (hasOAuth && (hasPassword || hasMagicLink)) body.push(divider)
+  if (hasPassword) body.push(`      <LoginForm redirectTo="/dashboard" />`)
   if (hasMagicLink) {
-    if (hasPassword || hasOAuth) {
-      body.push(
-        `      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '1rem 0' }}>`,
-      )
-      body.push(
-        `        <hr style={{ flex: 1 }} /><span style={{ color: '#6b7280', fontSize: '0.875rem' }}>or</span><hr style={{ flex: 1 }} />`,
-      )
-      body.push(`      </div>`)
-    }
+    if (hasPassword) body.push(divider)
     body.push(`      <MagicLinkForm />`)
   }
 
   if (hasPassword) {
-    body.push(`      <p style={{ textAlign: 'center', fontSize: '0.875rem', color: '#6b7280' }}>`)
     body.push(
-      `        Don&apos;t have an account? <a href="/signup" style={{ color: 'inherit', fontWeight: 500 }}>Sign up</a>`,
+      `      <p style={{ textAlign: 'center', fontSize: '0.8125rem', color: '${mutedColor}', margin: 0 }}>`,
     )
-    body.push(`      </p>`)
-    body.push(`      <p style={{ textAlign: 'center', fontSize: '0.875rem' }}>`)
     body.push(
-      `        <a href="/forgot-password" style={{ color: '#6b7280' }}>Forgot password?</a>`,
+      `        Don&apos;t have an account?{' '}<a href="/signup" style={{ color: '${fgColor}', fontWeight: 600, textDecoration: 'none' }}>Sign up</a>`,
     )
     body.push(`      </p>`)
   }
 
+  if (!isThemed) {
+    return [
+      ...imports,
+      '',
+      `// src/app/login/page.tsx — edit freely`,
+      `export default function LoginPage() {`,
+      `  return (`,
+      `    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`,
+      `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
+      `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: 0 }}>Sign in</h1>`,
+      ...body,
+      `      </div>`,
+      `    </main>`,
+      `  )`,
+      `}`,
+    ].join('\n')
+  }
+
+  // themed — modern gets a split layout, others get centered card
+  if (themeVariant === 'modern') {
+    return [
+      ...imports,
+      '',
+      `// src/app/login/page.tsx — edit freely`,
+      `export default function LoginPage() {`,
+      `  return (`,
+      `    <main className="sedim-auth-page" style={{ display: 'flex', minHeight: '100vh' }}>`,
+      `      {/* Left panel — form */}`,
+      `      <div style={{ flex: '0 0 480px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem', gap: '2rem' }}>`,
+      `        <div>`,
+      `          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.375rem' }}>Welcome back</h1>`,
+      `          <p style={{ color: 'var(--auth-muted)', fontSize: '0.9375rem', margin: 0 }}>Sign in to continue</p>`,
+      `        </div>`,
+      `        <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
+      ...body.map(l => '  ' + l),
+      `        </div>`,
+      `      </div>`,
+      `      {/* Right panel — decorative, replace with your own image */}`,
+      `      <div style={{ flex: 1, background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>`,
+      `        <div style={{ width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }} />`,
+      `      </div>`,
+      `    </main>`,
+      `  )`,
+      `}`,
+    ].join('\n')
+  }
+
+  // minimal / colorful — centered card
   return [
     ...imports,
     '',
-    `// src/app/login/page.tsx`,
-    `// Edit this file to customise the login page layout.`,
-    `// The form components are in src/sedim/auth/ui/`,
+    `// src/app/login/page.tsx — edit freely`,
     `export default function LoginPage() {`,
     `  return (`,
-    `    <main style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`,
-    `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
-    `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: '0 0 1rem' }}>Sign in</h1>`,
+    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`,
+    `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`,
+    `        <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>`,
+    `          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.25rem' }}>Welcome back</h1>`,
+    `          <p style={{ color: 'var(--auth-muted)', fontSize: '0.875rem', margin: 0 }}>Sign in to continue</p>`,
+    `        </div>`,
     ...body,
     `      </div>`,
     `    </main>`,
@@ -300,48 +368,92 @@ function buildSignupPage(features: string[]): string {
     .filter(f => f.startsWith('oauth-'))
     .map(f => f.replace('oauth-', ''))
   const hasOAuth = oauthProviders.length > 0
+  const isThemed = features.includes('themed')
+  const themeVariant = features.find(f => ['modern', 'minimal', 'colorful'].includes(f)) ?? 'modern'
+
+  const borderColor = isThemed ? 'var(--auth-border)' : '#e5e7eb'
+  const mutedColor = isThemed ? 'var(--auth-muted)' : '#6b7280'
+  const fgColor = isThemed ? 'var(--auth-fg)' : 'inherit'
 
   const imports: string[] = ["'use client'", '']
   if (hasPassword) imports.push(`import { SignupForm } from '@/sedim/auth/ui/SignupForm'`)
   if (hasOAuth) imports.push(`import { OAuthButton } from '@/sedim/auth/ui/OAuthButton'`)
 
+  const divider = [
+    `      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>`,
+    `        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid ${borderColor}', margin: 0 }} />`,
+    `        <span style={{ color: '${mutedColor}', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 500 }}>or</span>`,
+    `        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid ${borderColor}', margin: 0 }} />`,
+    `      </div>`,
+  ].join('\n')
+
   const body: string[] = []
-
-  if (hasPassword) body.push(`      <SignupForm redirectTo="/dashboard" />`)
-
-  if (hasOAuth && hasPassword) {
-    body.push(
-      `      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '1rem 0' }}>`,
-    )
-    body.push(
-      `        <hr style={{ flex: 1 }} /><span style={{ color: '#6b7280', fontSize: '0.875rem' }}>or</span><hr style={{ flex: 1 }} />`,
-    )
-    body.push(`      </div>`)
-  }
-
   if (hasOAuth) {
-    body.push(`      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>`)
-    for (const p of oauthProviders) {
-      body.push(`        <OAuthButton provider="${p}" />`)
-    }
+    body.push(`      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>`)
+    for (const p of oauthProviders) body.push(`        <OAuthButton provider="${p}" />`)
     body.push(`      </div>`)
   }
-
-  body.push(`      <p style={{ textAlign: 'center', fontSize: '0.875rem', color: '#6b7280' }}>`)
+  if (hasOAuth && hasPassword) body.push(divider)
+  if (hasPassword) body.push(`      <SignupForm redirectTo="/dashboard" />`)
   body.push(
-    `        Already have an account? <a href="/login" style={{ color: 'inherit', fontWeight: 500 }}>Sign in</a>`,
+    `      <p style={{ textAlign: 'center', fontSize: '0.8125rem', color: '${mutedColor}', margin: 0 }}>`,
+  )
+  body.push(
+    `        Already have an account?{' '}<a href="/login" style={{ color: '${fgColor}', fontWeight: 600, textDecoration: 'none' }}>Sign in</a>`,
   )
   body.push(`      </p>`)
+
+  if (!isThemed) {
+    return [
+      ...imports,
+      '',
+      `export default function SignupPage() {`,
+      `  return (`,
+      `    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`,
+      `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
+      `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: 0 }}>Create account</h1>`,
+      ...body,
+      `      </div>`,
+      `    </main>`,
+      `  )`,
+      `}`,
+    ].join('\n')
+  }
+
+  if (themeVariant === 'modern') {
+    return [
+      ...imports,
+      '',
+      `export default function SignupPage() {`,
+      `  return (`,
+      `    <main className="sedim-auth-page" style={{ display: 'flex', minHeight: '100vh' }}>`,
+      `      <div style={{ flex: '0 0 480px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem', gap: '2rem' }}>`,
+      `        <div>`,
+      `          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.375rem' }}>Create account</h1>`,
+      `          <p style={{ color: 'var(--auth-muted)', fontSize: '0.9375rem', margin: 0 }}>Get started for free</p>`,
+      `        </div>`,
+      `        <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
+      ...body.map(l => '  ' + l),
+      `        </div>`,
+      `      </div>`,
+      `      <div style={{ flex: 1, background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%)' }} />`,
+      `    </main>`,
+      `  )`,
+      `}`,
+    ].join('\n')
+  }
 
   return [
     ...imports,
     '',
-    `// src/app/signup/page.tsx`,
     `export default function SignupPage() {`,
     `  return (`,
-    `    <main style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`,
-    `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
-    `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: '0 0 1rem' }}>Create account</h1>`,
+    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`,
+    `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`,
+    `        <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>`,
+    `          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.25rem' }}>Create account</h1>`,
+    `          <p style={{ color: 'var(--auth-muted)', fontSize: '0.875rem', margin: 0 }}>Get started for free</p>`,
+    `        </div>`,
     ...body,
     `      </div>`,
     `    </main>`,
@@ -350,25 +462,57 @@ function buildSignupPage(features: string[]): string {
   ].join('\n')
 }
 
-function buildForgotPage(): string {
+function buildForgotPage(features: string[] = []): string {
+  const isThemed = features.includes('themed')
+  const themeVariant = features.find(f => ['modern', 'minimal', 'colorful'].includes(f)) ?? 'modern'
+  const mutedColor = isThemed ? 'var(--auth-muted)' : '#6b7280'
+  const fgColor = isThemed ? 'var(--auth-fg)' : '#6b7280'
+
+  const inner = [
+    `        <div style={{ textAlign: 'center' }}>`,
+    `          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.25rem' }}>Reset password</h1>`,
+    `          <p style={{ fontSize: '0.875rem', color: '${mutedColor}', margin: 0 }}>Enter your email and we&apos;ll send a reset link.</p>`,
+    `        </div>`,
+    `        <ForgotPasswordForm />`,
+    `        <p style={{ textAlign: 'center', fontSize: '0.8125rem', margin: 0 }}>`,
+    `          <a href="/login" style={{ color: '${fgColor}', textDecoration: 'none', fontWeight: 500 }}>Back to sign in</a>`,
+    `        </p>`,
+  ].join('\n')
+
+  if (!isThemed || themeVariant === 'modern') {
+    const wrapper = isThemed
+      ? `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`
+      : `    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`
+    const card = isThemed
+      ? `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`
+      : `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`
+    return [
+      `'use client'`,
+      ``,
+      `import { ForgotPasswordForm } from '@/sedim/auth/ui/ForgotPasswordForm'`,
+      ``,
+      `export default function ForgotPasswordPage() {`,
+      `  return (`,
+      wrapper,
+      card,
+      inner,
+      `      </div>`,
+      `    </main>`,
+      `  )`,
+      `}`,
+    ].join('\n')
+  }
+
   return [
     `'use client'`,
     ``,
     `import { ForgotPasswordForm } from '@/sedim/auth/ui/ForgotPasswordForm'`,
     ``,
-    `// src/app/forgot-password/page.tsx`,
     `export default function ForgotPasswordPage() {`,
     `  return (`,
-    `    <main style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`,
-    `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
-    `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: '0 0 0.5rem' }}>Reset password</h1>`,
-    `        <p style={{ textAlign: 'center', fontSize: '0.875rem', color: '#6b7280', margin: '0 0 1rem' }}>`,
-    `          Enter your email and we&apos;ll send you a reset link.`,
-    `        </p>`,
-    `        <ForgotPasswordForm />`,
-    `        <p style={{ textAlign: 'center', fontSize: '0.875rem' }}>`,
-    `          <a href="/login" style={{ color: '#6b7280' }}>Back to sign in</a>`,
-    `        </p>`,
+    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`,
+    `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`,
+    inner,
     `      </div>`,
     `    </main>`,
     `  )`,
@@ -376,23 +520,135 @@ function buildForgotPage(): string {
   ].join('\n')
 }
 
-function buildResetPage(): string {
+function buildResetPage(features: string[] = []): string {
+  const isThemed = features.includes('themed')
+  const wrapper = isThemed
+    ? `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`
+    : `    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`
+  const card = isThemed
+    ? `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`
+    : `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`
+
   return [
     `'use client'`,
     ``,
     `import { ResetPasswordForm } from '@/sedim/auth/ui/ResetPasswordForm'`,
     ``,
-    `// src/app/reset-password/page.tsx`,
     `// The token is read from the URL query param automatically by ResetPasswordForm.`,
     `export default function ResetPasswordPage() {`,
     `  return (`,
-    `    <main style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`,
-    `      <div style={{ width: '100%', maxWidth: '24rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
-    `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: '0 0 1rem' }}>Set new password</h1>`,
+    wrapper,
+    card,
+    `        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', margin: 0 }}>Set new password</h1>`,
     `        <ResetPasswordForm redirectTo="/login" />`,
     `      </div>`,
     `    </main>`,
     `  )`,
     `}`,
+  ].join('\n')
+}
+
+// ── DB client file generator ──────────────────────────────────
+// Generates src/db/index.ts wired to the correct driver.
+// Detects the driver from the project's package.json dependencies.
+// The user just needs to set DATABASE_URL in .env — nothing else.
+
+function buildDbClientFile(ctx: DetectedContext): string {
+  const db = ctx.db.value
+
+  // detect specific driver from evidence strings — the detector records
+  // which package it found as evidence, e.g. '"@neondatabase/serverless" in dependencies'
+  const evidence = ctx.db.evidence?.join(' ') ?? ''
+
+  if (db === 'postgres') {
+    if (evidence.includes('@neondatabase/serverless')) {
+      return [
+        `// src/db/index.ts`,
+        `// Drizzle client — Neon serverless postgres`,
+        `// Generated by sedim. Edit freely.`,
+        `import { neon } from '@neondatabase/serverless'`,
+        `import { drizzle } from 'drizzle-orm/neon-http'`,
+        ``,
+        `const sql = neon(process.env['DATABASE_URL']!)`,
+        `export const db = drizzle(sql)`,
+      ].join('\n')
+    }
+    if (evidence.includes('@vercel/postgres')) {
+      return [
+        `// src/db/index.ts`,
+        `// Drizzle client — Vercel postgres`,
+        `import { sql } from '@vercel/postgres'`,
+        `import { drizzle } from 'drizzle-orm/vercel-postgres'`,
+        ``,
+        `export const db = drizzle(sql)`,
+      ].join('\n')
+    }
+    // generic pg fallback
+    return [
+      `// src/db/index.ts`,
+      `// Drizzle client — node-postgres`,
+      `import { Pool } from 'pg'`,
+      `import { drizzle } from 'drizzle-orm/node-postgres'`,
+      ``,
+      `const pool = new Pool({ connectionString: process.env['DATABASE_URL']! })`,
+      `export const db = drizzle(pool)`,
+    ].join('\n')
+  }
+
+  if (db === 'mysql') {
+    if (evidence.includes('@planetscale/database')) {
+      return [
+        `// src/db/index.ts`,
+        `// Drizzle client — PlanetScale`,
+        `import { connect } from '@planetscale/database'`,
+        `import { drizzle } from 'drizzle-orm/planetscale-serverless'`,
+        ``,
+        `const connection = connect({ url: process.env['DATABASE_URL']! })`,
+        `export const db = drizzle(connection)`,
+      ].join('\n')
+    }
+    return [
+      `// src/db/index.ts`,
+      `// Drizzle client — mysql2`,
+      `import mysql from 'mysql2/promise'`,
+      `import { drizzle } from 'drizzle-orm/mysql2'`,
+      ``,
+      `const connection = await mysql.createConnection(process.env['DATABASE_URL']!)`,
+      `export const db = drizzle(connection)`,
+    ].join('\n')
+  }
+
+  if (db === 'sqlite') {
+    if (evidence.includes('@libsql/client')) {
+      return [
+        `// src/db/index.ts`,
+        `// Drizzle client — Turso / libSQL`,
+        `import { createClient } from '@libsql/client'`,
+        `import { drizzle } from 'drizzle-orm/libsql'`,
+        ``,
+        `const client = createClient({ url: process.env['DATABASE_URL']! })`,
+        `export const db = drizzle(client)`,
+      ].join('\n')
+    }
+    return [
+      `// src/db/index.ts`,
+      `// Drizzle client — better-sqlite3`,
+      `import Database from 'better-sqlite3'`,
+      `import { drizzle } from 'drizzle-orm/better-sqlite3'`,
+      ``,
+      `const sqlite = new Database(process.env['DATABASE_URL'] ?? 'local.db')`,
+      `export const db = drizzle(sqlite)`,
+    ].join('\n')
+  }
+
+  // unknown — generic stub with a comment
+  return [
+    `// src/db/index.ts`,
+    `// Drizzle client — configure this for your database driver`,
+    `// See: https://orm.drizzle.team/docs/get-started`,
+    `import { drizzle } from 'drizzle-orm/node-postgres'`,
+    ``,
+    `// Replace with your actual driver setup`,
+    `export const db = drizzle(process.env['DATABASE_URL']!)`,
   ].join('\n')
 }
