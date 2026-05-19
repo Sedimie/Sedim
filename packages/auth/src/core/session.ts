@@ -1,11 +1,23 @@
 export const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30 // 30 days
 
 export interface Session {
-  /** SHA-256 hash of the raw token. DB primary key. */
+  /** SHA-256 hash of the raw token. DB primary key. Never expose to clients. */
   id: string
   userId: string
   expiresAt: Date
   fresh: boolean
+  createdAt: Date
+}
+
+/**
+ * Safe session view for client-facing use (e.g. session list UI).
+ * Excludes the token hash — clients only see metadata.
+ */
+export interface SessionInfo {
+  id: string
+  expiresAt: Date
+  fresh: boolean
+  createdAt: Date
 }
 
 export interface SessionValidationResult {
@@ -21,6 +33,7 @@ export function buildSession(tokenHash: string, userId: string): Session {
     userId,
     expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
     fresh: true,
+    createdAt: new Date(),
   }
 }
 
