@@ -68,6 +68,42 @@ export function createAuthPlanConfig(
     overwriteStrategy: 'skip',
   })
 
+  // rate limiting — stamped when any auth feature is selected
+  if (selectedFeatures.some(f => ['email-password', 'magic-link', 'totp'].includes(f))) {
+    templates.push({
+      templateKey: 'auth/core/rate-limit',
+      outputPath: () => `${authDir}/core/rate-limit.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // RBAC — stamped when rbac feature is selected
+  if (selectedFeatures.includes('rbac')) {
+    templates.push({
+      templateKey: 'auth/core/rbac',
+      outputPath: () => `${authDir}/core/rbac.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // ABAC — stamped when abac feature is selected
+  if (selectedFeatures.includes('abac')) {
+    templates.push({
+      templateKey: 'auth/core/abac',
+      outputPath: () => `${authDir}/core/abac.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // JWT — stamped when jwt feature is selected
+  if (selectedFeatures.includes('jwt')) {
+    templates.push({
+      templateKey: 'auth/core/jwt',
+      outputPath: () => `${authDir}/core/jwt.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
   // adapter types — always stamped
   templates.push({
     templateKey: 'auth/adapters/types',
@@ -124,6 +160,13 @@ export function createAuthPlanConfig(
       templates.push({
         templateKey: 'auth/schema/prisma-totp',
         outputPath: () => `${authDir}/schema-totp.prisma`,
+        overwriteStrategy: 'skip',
+      })
+    }
+    if (features.includes('jwt')) {
+      templates.push({
+        templateKey: 'auth/schema/prisma-refresh-tokens',
+        outputPath: () => `${authDir}/schema-refresh-tokens.prisma`,
         overwriteStrategy: 'skip',
       })
     }
@@ -255,6 +298,15 @@ export function createAuthPlanConfig(
         overwriteStrategy: 'ask',
       })
     }
+  }
+
+  // Email templates — stamped when magic-link or email-password with SMTP is configured
+  if (selectedFeatures.includes('magic-link') || selectedFeatures.includes('email-password')) {
+    templates.push({
+      templateKey: 'auth/templates/emails/email-verification',
+      outputPath: () => `${authDir}/emails/email-verification.ts`,
+      overwriteStrategy: 'skip',
+    })
   }
 
   // DB adapter wiring file — one level above sedim/auth
