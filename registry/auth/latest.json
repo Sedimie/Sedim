@@ -1,9 +1,9 @@
 {
   "name": "auth",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "layers": {
     "protocol": ["http-cookies", "oauth-redirect", "magic-link", "totp"],
-    "logic": ["password-hash", "session-token", "pkce", "totp", "backup-codes"],
+    "logic": ["password-hash", "session-token", "pkce", "totp", "backup-codes", "jwt"],
     "persistence": {
       "tables": [
         "users",
@@ -11,7 +11,8 @@
         "otp_tokens",
         "oauth_accounts",
         "totp_credentials",
-        "backup_codes"
+        "backup_codes",
+        "refresh_tokens"
       ],
       "requires": []
     },
@@ -39,6 +40,18 @@
       "oauth-github",
       "oauth-discord",
       "totp"
+    ],
+    "authorization": [
+      "rbac",
+      "abac"
+    ],
+    "session": [
+      "session-cookie",
+      "jwt"
+    ],
+    "security": [
+      "rate-limit",
+      "account-lockout"
     ],
     "ui": ["headless", "tailwind", "themed"]
   },
