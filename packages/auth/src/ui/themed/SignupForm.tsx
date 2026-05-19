@@ -23,6 +23,7 @@ export function SignupForm({ onSuccess, onError, redirectTo }: SignupFormProps) 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -50,7 +51,13 @@ export function SignupForm({ onSuccess, onError, redirectTo }: SignupFormProps) 
       </div>
       <div style={s.field}>
         <label htmlFor="signup-password" style={s.label}>Password</label>
-        <input id="signup-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" disabled={loading} style={s.input} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input id="signup-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" disabled={loading} style={{ ...s.input, paddingRight: '3rem' }} />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.75rem', background: 'transparent', border: 'none', color: 'var(--auth-muted)', cursor: 'pointer', fontSize: '0.75rem' }} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        <p style={{ fontSize: 'calc(var(--auth-font-size-sm) - 1px)', color: 'var(--auth-muted)', margin: '0.25rem 0 0' }}>At least 8 characters</p>
       </div>
       <div style={s.field}>
         <label htmlFor="signup-confirm" style={s.label}>Confirm password</label>

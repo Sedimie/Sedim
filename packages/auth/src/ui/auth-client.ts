@@ -22,6 +22,13 @@ export interface AuthSession {
   user: AuthUser | null
 }
 
+export interface SessionInfo {
+  id: string
+  expiresAt: string
+  fresh: boolean
+  createdAt: string
+}
+
 export type AuthError =
   | 'invalid-credentials'
   | 'email-taken'
@@ -32,6 +39,7 @@ export type AuthError =
   | 'totp-not-enabled'
   | 'backup-code-invalid'
   | 'oauth-provider-unknown'
+  | 'account-locked'
   | 'network-error'
   | string
 
@@ -71,6 +79,18 @@ async function get<T>(path: string): Promise<AuthResult<T>> {
 export async function getSession(): Promise<AuthUser | null> {
   const result = await get<{ user: AuthUser | null }>('/session')
   return result.ok ? result.data.user : null
+}
+
+export async function listSessions(): Promise<AuthResult<SessionInfo[]>> {
+  return get<{ sessions: SessionInfo[] }>('/sessions')
+}
+
+export async function revokeSession(sessionId: string): Promise<AuthResult<{ ok: true }>> {
+  return post('/sessions/revoke', { sessionId })
+}
+
+export async function revokeAllSessions(): Promise<AuthResult<{ ok: true }>> {
+  return post('/sessions/revoke-all', {})
 }
 
 // ── Email + Password ──────────────────────────────────────────

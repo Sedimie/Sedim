@@ -86,7 +86,7 @@ export function LoginForm({ onSuccess, onTotpRequired, onError, redirectTo }: Lo
           </button>
         </div>
       </div>
-      {error && <p role="alert" style={s.error}>{error === 'invalid-credentials' ? 'Invalid email or password.' : 'Something went wrong.'}</p>}
+      {error && <p role="alert" style={s.error}>{error === 'invalid-credentials' ? 'Invalid email or password.' : error === 'account-locked' ? 'Too many failed attempts. Try again in 15 minutes.' : 'Something went wrong.'}</p>}
       <button type="submit" disabled={loading} style={{ ...s.button, opacity: loading ? 0.5 : 1 }}>
         {loading ? 'Signing in…' : 'Sign in'}
       </button>
