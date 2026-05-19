@@ -18,6 +18,9 @@ import {
   verifyBackupCode,
   createPasswordResetToken,
   confirmPasswordReset,
+  listUserSessions,
+  revokeSession,
+  revokeAllSessions,
 } from './operations.js'
 
 // Hono context variable types
@@ -137,6 +140,36 @@ export function createHonoAuthRoutes(config: AuthConfig) {
     return c.json({ user: sanitizeUser(result.user) })
   })
 
+  // GET /sessions
+  app.get('/sessions', async (c) => {
+    const token = getCookie(c, resolved.cookieName) ?? null
+    const result = await validateRequest(resolved.db, token)
+    if (!result) return c.json({ error: 'unauthorized' }, 401)
+    const sessions = await listUserSessions(resolved.db, result.user.id)
+    return c.json({ sessions })
+  })
+
+  // POST /sessions/revoke
+  app.post('/sessions/revoke', async (c) => {
+    const token = getCookie(c, resolved.cookieName) ?? null
+    const result = await validateRequest(resolved.db, token)
+    if (!result) return c.json({ error: 'unauthorized' }, 401)
+    const { sessionId } = await c.req.json<{ sessionId?: string }>()
+    if (!sessionId) return c.json({ error: 'sessionId required' }, 400)
+    await revokeSession(resolved.db, sessionId)
+    return c.json({ ok: true })
+  })
+
+  // POST /sessions/revoke-all
+  app.post('/sessions/revoke-all', async (c) => {
+    const token = getCookie(c, resolved.cookieName) ?? null
+    const result = await validateRequest(resolved.db, token)
+    if (!result) return c.json({ error: 'unauthorized' }, 401)
+    await revokeAllSessions(resolved.db, result.user.id)
+    deleteCookie(c, resolved.cookieName, { path: '/' })
+    return c.json({ ok: true })
+  })
+
   // POST /magic-link
   app.post('/magic-link', async (c) => {
     const { email } = await c.req.json<{ email?: string }>()
@@ -200,7 +233,7 @@ export function createHonoAuthRoutes(config: AuthConfig) {
     if (!pendingCookie?.startsWith('pending:') || !code) return c.json({ error: 'invalid request' }, 400)
 
     const userId = pendingCookie.replace('pending:', '')
-    const result = await completeTotpLogin(resolved.db, userId, code)
+    const result = await completeTotpLogin(resolved.db, resolved.secret, userId, code)
     if (!result.ok) return c.json({ error: result.error }, 401)
 
     deleteCookie(c, 'auth_pending_mfa', { path: '/' })

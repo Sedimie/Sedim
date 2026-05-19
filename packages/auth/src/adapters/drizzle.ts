@@ -1,5 +1,5 @@
 import type { Session } from '../core/session.js'
-import type { DatabaseAdapter, User, OtpToken, OAuthAccount, TotpCredential, BackupCode } from './types.js'
+import type { DatabaseAdapter, User, OtpToken, OAuthAccount, TotpCredential, BackupCode, RefreshToken } from './types.js'
 
 // ── Schema shape the adapter expects ─────────────────────────
 // The user owns their Drizzle schema. This adapter accepts the table
@@ -22,6 +22,8 @@ export interface AuthDrizzleSchema {
     email: string
     emailVerified: boolean
     passwordHash: string | null
+    failedLoginAttempts: number
+    lockedAt: Date | null
     createdAt: Date
   }>
   sessions: DrizzleTable<{
@@ -29,6 +31,7 @@ export interface AuthDrizzleSchema {
     userId: string
     expiresAt: Date
     fresh: boolean
+    createdAt: Date
   }>
   otpTokens: DrizzleTable<{
     id: string
@@ -53,6 +56,13 @@ export interface AuthDrizzleSchema {
     userId: string
     codeHash: string
     usedAt: Date | null
+  }>
+  refreshTokens: DrizzleTable<{
+    id: string
+    userId: string
+    sessionId: string
+    expiresAt: Date
+    createdAt: Date
   }>
 }
 
@@ -84,6 +94,9 @@ interface DrizzleUpdateBuilder {
 interface DrizzleDeleteBuilder {
   where(condition: unknown): Promise<void>
 }
+interface DrizzleGtBuilder {
+  where(condition: unknown): Promise<void>
+}
 
 // ── Factory ───────────────────────────────────────────────────
 
@@ -94,12 +107,13 @@ interface DrizzleDeleteBuilder {
  * @param schema - Your auth schema tables (users, sessions, etc.)
  * @param eq     - Drizzle's eq() operator, imported from 'drizzle-orm'
  * @param and    - Drizzle's and() operator, imported from 'drizzle-orm'
+ * @param lt     - Drizzle's lt() operator, imported from 'drizzle-orm'
  *
  * Example:
- *   import { eq, and } from 'drizzle-orm'
+ *   import { eq, and, lt } from 'drizzle-orm'
  *   import { db } from './db'
  *   import * as schema from './db/schema/auth'
- *   export const dbAdapter = createDrizzleAdapter(db, schema, eq, and)
+ *   export const dbAdapter = createDrizzleAdapter(db, schema, eq, and, lt)
  */
 export function createDrizzleAdapter(
   db: DrizzleDb,
@@ -115,7 +129,7 @@ export function createDrizzleAdapter(
       const id = crypto.randomUUID()
       const rows = await db
         .insert(schema.users)
-        .values({ id, ...data, emailVerified: false, createdAt: new Date() })
+        .values({ id, ...data, emailVerified: false, failedLoginAttempts: 0, lockedAt: null, createdAt: new Date() })
         .returning()
       return rows[0] as User
     },
@@ -150,6 +164,14 @@ export function createDrizzleAdapter(
       return (rows[0] as Session) ?? null
     },
 
+    async findSessionById(sessionId) {
+      const rows = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions['id'], sessionId))
+      return (rows[0] as Session) ?? null
+    },
+
     async updateSessionExpiry(tokenHash, expiresAt) {
       await db
         .update(schema.sessions)
@@ -161,8 +183,20 @@ export function createDrizzleAdapter(
       await db.delete(schema.sessions).where(eq(schema.sessions['id'], tokenHash))
     },
 
+    async deleteSessionById(sessionId) {
+      await db.delete(schema.sessions).where(eq(schema.sessions['id'], sessionId))
+    },
+
     async deleteAllUserSessions(userId) {
       await db.delete(schema.sessions).where(eq(schema.sessions['userId'], userId))
+    },
+
+    async findAllUserSessions(userId) {
+      const rows = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions['userId'], userId))
+      return rows as Session[]
     },
 
     // ── otp tokens ──────────────────────────────────────────
@@ -270,6 +304,30 @@ export function createDrizzleAdapter(
 
     async deleteAllBackupCodes(userId) {
       await db.delete(schema.backupCodes).where(eq(schema.backupCodes['userId'], userId))
+    },
+
+    // ── refresh tokens ───────────────────────────────────────
+
+    async createRefreshToken(data) {
+      await db.insert(schema.refreshTokens).values(data).returning()
+    },
+
+    async findRefreshToken(id) {
+      const rows = await db
+        .select()
+        .from(schema.refreshTokens)
+        .where(eq(schema.refreshTokens['id'], id))
+      return (rows[0] as RefreshToken) ?? null
+    },
+
+    async deleteRefreshToken(id) {
+      await db.delete(schema.refreshTokens).where(eq(schema.refreshTokens['id'], id))
+    },
+
+    async deleteExpiredRefreshTokens() {
+      await db.delete(schema.refreshTokens).where(
+        lt(schema.refreshTokens['expiresAt'], new Date())
+      )
     },
   }
 }

@@ -19,6 +19,9 @@ import {
   verifyBackupCode,
   createPasswordResetToken,
   confirmPasswordReset,
+  listUserSessions,
+  revokeSession,
+  revokeAllSessions,
 } from './operations.js'
 
 // ── Cookie helpers ────────────────────────────────────────────
@@ -93,6 +96,16 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
       const result = await validateRequest(resolved.db, token)
       if (!result) return NextResponse.json({ user: null }, { status: 401 })
       return NextResponse.json({ user: sanitizeUser(result.user) })
+    }
+
+    // GET /api/auth/sessions — list all sessions for the current user
+    if (path === 'sessions') {
+      const token = await getSessionToken(resolved)
+      const sessionResult = await validateRequest(resolved.db, token)
+      if (!sessionResult) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+      const sessions = await listUserSessions(resolved.db, sessionResult.user.id)
+      return NextResponse.json({ sessions })
     }
 
     // GET /api/auth/magic-link/verify?token=...
@@ -219,7 +232,7 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
         return NextResponse.json({ error: 'invalid request' }, { status: 400 })
       }
       const userId = pendingCookie.replace('pending:', '')
-      const result = await completeTotpLogin(resolved.db, userId, code)
+      const result = await completeTotpLogin(resolved.db, resolved.secret, userId, code)
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 })
 
       const response = NextResponse.json({ user: sanitizeUser(result.data.user) })
@@ -267,6 +280,30 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
       }
       const result = await confirmPasswordReset(resolved.db, token, password)
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
+      await clearSessionCookie(resolved)
+      return NextResponse.json({ ok: true })
+    }
+
+    // POST /api/auth/sessions/revoke — revoke a single session
+    if (path === 'sessions/revoke') {
+      const token = await getSessionToken(resolved)
+      const sessionResult = await validateRequest(resolved.db, token)
+      if (!sessionResult) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+      const { sessionId } = body as { sessionId?: string }
+      if (!sessionId) return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
+
+      await revokeSession(resolved.db, sessionId)
+      return NextResponse.json({ ok: true })
+    }
+
+    // POST /api/auth/sessions/revoke-all — revoke all sessions except current
+    if (path === 'sessions/revoke-all') {
+      const token = await getSessionToken(resolved)
+      const sessionResult = await validateRequest(resolved.db, token)
+      if (!sessionResult) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+      await revokeAllSessions(resolved.db, sessionResult.user.id)
       await clearSessionCookie(resolved)
       return NextResponse.json({ ok: true })
     }

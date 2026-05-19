@@ -7,6 +7,10 @@ export interface User {
   email: string
   emailVerified: boolean
   passwordHash: string | null // null for OAuth-only accounts
+  /** Number of consecutive failed login attempts. Reset to 0 on successful login. */
+  failedLoginAttempts: number
+  /** If locked, the timestamp when the lock expires. Null if not locked. */
+  lockedAt: Date | null
   createdAt: Date
 }
 
@@ -46,6 +50,16 @@ export interface BackupCode {
   usedAt: Date | null
 }
 
+// ── Refresh tokens (JWT refresh tokens stored in DB) ───────────
+
+export interface RefreshToken {
+  id: string        // hashed token — lookup key
+  userId: string
+  sessionId: string
+  expiresAt: Date
+  createdAt: Date
+}
+
 // ── DatabaseAdapter ───────────────────────────────────────────
 // The contract every ORM adapter must implement.
 // The core never imports Drizzle, Prisma, or any DB client directly —
@@ -56,14 +70,19 @@ export interface DatabaseAdapter {
   createUser(data: { email: string; passwordHash: string | null }): Promise<User>
   findUserByEmail(email: string): Promise<User | null>
   findUserById(id: string): Promise<User | null>
-  updateUser(id: string, data: Partial<Pick<User, 'emailVerified' | 'passwordHash'>>): Promise<User>
+  updateUser(id: string, data: Partial<Pick<User, 'emailVerified' | 'passwordHash' | 'failedLoginAttempts' | 'lockedAt'>>): Promise<User>
 
   // sessions
   createSession(session: Session): Promise<void>
   findSession(tokenHash: string): Promise<Session | null>
+  /** Find a session by its own ID (used for single-session revocation). */
+  findSessionById(sessionId: string): Promise<Session | null>
   updateSessionExpiry(tokenHash: string, expiresAt: Date): Promise<void>
   deleteSession(tokenHash: string): Promise<void>
+  deleteSessionById(sessionId: string): Promise<void>
   deleteAllUserSessions(userId: string): Promise<void>
+  /** Returns all sessions for a user (for session list / revocation UI). */
+  findAllUserSessions(userId: string): Promise<Session[]>
 
   // otp tokens
   createOtpToken(data: Omit<OtpToken, 'id'>): Promise<OtpToken>
@@ -86,6 +105,12 @@ export interface DatabaseAdapter {
   findBackupCode(userId: string, codeHash: string): Promise<BackupCode | null>
   markBackupCodeUsed(id: string): Promise<void>
   deleteAllBackupCodes(userId: string): Promise<void>
+
+  // refresh tokens
+  createRefreshToken(data: Omit<RefreshToken, 'createdAt'>): Promise<void>
+  findRefreshToken(id: string): Promise<RefreshToken | null>
+  deleteRefreshToken(id: string): Promise<void>
+  deleteExpiredRefreshTokens(): Promise<void>
 }
 
 // ── SessionTransport ──────────────────────────────────────────

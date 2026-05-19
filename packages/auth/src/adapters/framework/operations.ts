@@ -2,7 +2,7 @@ import { hashPassword, verifyPassword, needsRehash } from '../core/hash-password
 import { generateSessionToken, hashSessionToken, generateOtpToken, hashBackupCode } from '../core/generate-token.js'
 import { buildSession, validateSession } from '../core/session.js'
 import { generatePkcePair, buildAuthorizationUrl } from '../core/pkce.js'
-import { verifyTotpCode } from '../core/totp.js'
+import { verifyTotpCode, buildTotpUri } from '../core/totp.js'
 import type { DatabaseAdapter, User } from './types.js'
 import type { Session } from '../core/session.js'
 import type { ResolvedAuthConfig, OAuthProfile } from './framework-config.js'
@@ -26,6 +26,7 @@ export type AuthError =
   | 'oauth-state-mismatch'
   | 'oauth-provider-unknown'
   | 'oauth-exchange-failed'
+  | 'account-locked'
 
 // ── Signup ────────────────────────────────────────────────────
 
@@ -47,6 +48,10 @@ export async function signupWithPassword(
   return { ok: true, data: { user, token, session } }
 }
 
+// ── Lockout constants ──────────────────────────────────────────
+const MAX_FAILED_ATTEMPTS = 10
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000 // 15 minutes
+
 // ── Login ─────────────────────────────────────────────────────
 
 export async function loginWithPassword(
@@ -57,8 +62,31 @@ export async function loginWithPassword(
   const user = await db.findUserByEmail(email)
   if (!user || !user.passwordHash) return { ok: false, error: 'invalid-credentials' }
 
+  // Check account lockout
+  if (user.lockedAt !== null && user.lockedAt.getTime() > Date.now()) {
+    return { ok: false, error: 'account-locked' }
+  }
+
   const valid = await verifyPassword(user.passwordHash, password)
-  if (!valid) return { ok: false, error: 'invalid-credentials' }
+  if (!valid) {
+    const attempts = (user.failedLoginAttempts ?? 0) + 1
+    const updates: Partial<Pick<User, 'failedLoginAttempts' | 'lockedAt'>> = {
+      failedLoginAttempts: attempts,
+    }
+    if (attempts >= MAX_FAILED_ATTEMPTS) {
+      updates.lockedAt = new Date(Date.now() + LOCKOUT_DURATION_MS)
+    }
+    await db.updateUser(user.id, updates)
+    return { ok: false, error: 'invalid-credentials' }
+  }
+
+  // Successful login — reset lockout counters
+  if (user.failedLoginAttempts > 0 || user.lockedAt !== null) {
+    await db.updateUser(user.id, {
+      failedLoginAttempts: 0,
+      lockedAt: null,
+    })
+  }
 
   // silently rehash if parameters have been upgraded
   if (needsRehash(user.passwordHash)) {
@@ -278,15 +306,65 @@ export async function handleOAuthCallback(
 
 // ── TOTP ──────────────────────────────────────────────────────
 
+export async function setupTotp(
+  db: DatabaseAdapter,
+  userId: string,
+  secret: string,        // base32-encoded secret from generateTotpSecret
+  authSecret: string,    // AUTH_SECRET env var — used to encrypt the secret at rest
+): Promise<{ encryptedSecret: string; backupCodes: string[] }> {
+  const existing = await db.findTotpCredential(userId)
+  if (existing) return { ok: false, error: 'totp-already-enabled' } as any
+
+  // encrypt before storing — never store plaintext secrets
+  const { encryptTotpSecret } = await import('../../core/totp-crypto.js')
+  const encryptedSecret = encryptTotpSecret(secret, authSecret)
+
+  await db.createTotpCredential({
+    userId,
+    secret: encryptedSecret,
+    lastUsedCounter: null,
+  })
+
+  // generate and hash backup codes
+  const rawCodes = generateBackupCodes(10)
+  const codesWithHash = rawCodes.map(code => ({ codeHash: hashBackupCode(code), userId, id: crypto.randomUUID(), usedAt: null }))
+  await db.createBackupCodes(codesWithHash)
+
+  return { encryptedSecret, backupCodes: rawCodes }
+}
+
+export async function getTotpUri(
+  db: DatabaseAdapter,
+  userId: string,
+  email: string,
+  authSecret: string,
+): Promise<string | null> {
+  const credential = await db.findTotpCredential(userId)
+  if (!credential) return null
+
+  // decrypt to get the plaintext secret for URI construction
+  const { decryptTotpSecret } = await import('../../core/totp-crypto.js')
+  const secret = decryptTotpSecret(credential.secret, authSecret)
+  if (!secret) return null
+
+  return buildTotpUri(secret, email, 'Sedim')
+}
+
 export async function completeTotpLogin(
   db: DatabaseAdapter,
+  authSecret: string,
   userId: string,
   code: string,
 ): Promise<AuthResult<{ user: User; token: string; session: Session }>> {
   const credential = await db.findTotpCredential(userId)
   if (!credential) return { ok: false, error: 'totp-not-enabled' }
 
-  const { valid, usedCounter } = verifyTotpCode(credential.secret, code)
+  // Decrypt the stored secret before verifying
+  const { decryptTotpSecret } = await import('../../core/totp-crypto.js')
+  const secret = decryptTotpSecret(credential.secret, authSecret)
+  if (!secret) return { ok: false, error: 'totp-invalid' }
+
+  const { valid, usedCounter } = verifyTotpCode(secret, code)
   if (!valid) return { ok: false, error: 'totp-invalid' }
 
   // reject replay within drift window
@@ -330,6 +408,29 @@ export async function verifyBackupCode(
   await db.createSession(session)
 
   return { ok: true, data: { user, token: sessionToken, session } }
+}
+
+// ── Session revocation ─────────────────────────────────────────
+
+export async function revokeSession(
+  db: DatabaseAdapter,
+  sessionId: string,
+): Promise<void> {
+  await db.deleteSessionById(sessionId)
+}
+
+export async function revokeAllSessions(
+  db: DatabaseAdapter,
+  userId: string,
+): Promise<void> {
+  await db.deleteAllUserSessions(userId)
+}
+
+export async function listUserSessions(
+  db: DatabaseAdapter,
+  userId: string,
+): Promise<Session[]> {
+  return db.findAllUserSessions(userId)
 }
 
 // ── Password reset ────────────────────────────────────────────

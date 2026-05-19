@@ -9,6 +9,7 @@ import {
   signupWithPassword, loginWithPassword, logout, validateRequest,
   createMagicLink, verifyMagicLink, createOAuthRedirect, handleOAuthCallback,
   completeTotpLogin, verifyBackupCode, createPasswordResetToken, confirmPasswordReset,
+  listUserSessions, revokeSession, revokeAllSessions,
 } from './operations.js'
 
 // Auth data is attached to res.locals so it doesn't require module augmentation.
@@ -115,6 +116,30 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
     res.status(200).json({ user: sanitizeUser(r.user) })
   })
 
+  router.get('/sessions', async (req: Request, res: Response) => {
+    const r = await validateRequest(rc.db, getToken(req, rc))
+    if (!r) { res.status(401).json({ error: 'unauthorized' }); return }
+    const sessions = await listUserSessions(rc.db, r.user.id)
+    res.status(200).json({ sessions })
+  })
+
+  router.post('/sessions/revoke', async (req: Request, res: Response) => {
+    const r = await validateRequest(rc.db, getToken(req, rc))
+    if (!r) { res.status(401).json({ error: 'unauthorized' }); return }
+    const { sessionId } = req.body as { sessionId?: string }
+    if (!sessionId) { res.status(400).json({ error: 'sessionId required' }); return }
+    await revokeSession(rc.db, sessionId)
+    res.status(200).json({ ok: true })
+  })
+
+  router.post('/sessions/revoke-all', async (req: Request, res: Response) => {
+    const r = await validateRequest(rc.db, getToken(req, rc))
+    if (!r) { res.status(401).json({ error: 'unauthorized' }); return }
+    await revokeAllSessions(rc.db, r.user.id)
+    clearSessionCookie(res, rc)
+    res.status(200).json({ ok: true })
+  })
+
   router.post('/magic-link', async (req: Request, res: Response) => {
     const { email } = req.body as { email?: string }
     if (!email) { res.status(400).json({ error: 'email required' }); return }
@@ -160,7 +185,7 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
     const pending = getCookies(req)['auth_pending_mfa']
     const { code } = req.body as { code?: string }
     if (!pending?.startsWith('pending:') || !code) { res.status(400).json({ error: 'invalid request' }); return }
-    const r = await completeTotpLogin(rc.db, pending.replace('pending:', ''), code)
+    const r = await completeTotpLogin(rc.db, rc.secret, pending.replace('pending:', ''), code)
     if (!r.ok) { res.status(401).json({ error: r.error }); return }
     res.clearCookie('auth_pending_mfa', { path: '/' })
     setSessionCookie(res, r.data.token, r.data.session.expiresAt, rc)

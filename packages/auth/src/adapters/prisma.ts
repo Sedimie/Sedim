@@ -17,6 +17,7 @@ interface PrismaClient {
   oAuthAccount: PrismaModel<OAuthAccountCreateInput, OAuthAccountWhereInput, Record<string, never>>
   totpCredential: PrismaModel<TotpCredentialCreateInput, TotpCredentialWhereInput, TotpCredentialUpdateInput>
   backupCode: PrismaModel<BackupCodeCreateInput, BackupCodeWhereInput, BackupCodeUpdateInput>
+  refreshToken: PrismaModel<RefreshTokenCreateInput, RefreshTokenWhereInput, Record<string, never>>
 }
 
 interface PrismaModel<TCreate, TWhere, TUpdate> {
@@ -30,11 +31,11 @@ interface PrismaModel<TCreate, TWhere, TUpdate> {
 }
 
 // Input types — mirror what Prisma generates from the auth schema
-interface UserCreateInput { id: string; email: string; emailVerified: boolean; passwordHash: string | null; createdAt: Date }
+interface UserCreateInput { id: string; email: string; emailVerified: boolean; passwordHash: string | null; failedLoginAttempts: number; lockedAt: Date | null; createdAt: Date }
 interface UserWhereInput { id?: string; email?: string }
-interface UserUpdateInput { emailVerified?: boolean; passwordHash?: string | null }
+interface UserUpdateInput { emailVerified?: boolean; passwordHash?: string | null; failedLoginAttempts?: number; lockedAt?: Date | null }
 
-interface SessionCreateInput { id: string; userId: string; expiresAt: Date; fresh: boolean }
+interface SessionCreateInput { id: string; userId: string; expiresAt: Date; fresh: boolean; createdAt: Date }
 interface SessionWhereInput { id?: string; userId?: string }
 interface SessionUpdateInput { expiresAt?: Date; fresh?: boolean }
 
@@ -51,6 +52,9 @@ interface TotpCredentialUpdateInput { lastUsedCounter?: number }
 interface BackupCodeCreateInput { id: string; userId: string; codeHash: string; usedAt: null }
 interface BackupCodeWhereInput { id?: string; userId?: string; codeHash?: string }
 interface BackupCodeUpdateInput { usedAt?: Date }
+
+interface RefreshTokenCreateInput { id: string; userId: string; sessionId: string; expiresAt: Date; createdAt: Date }
+interface RefreshTokenWhereInput { id?: string }
 
 // ── Factory ───────────────────────────────────────────────────
 
@@ -70,7 +74,7 @@ export function createPrismaAdapter(prisma: PrismaClient): DatabaseAdapter {
 
     async createUser(data) {
       return prisma.user.create({
-        data: { id: crypto.randomUUID(), ...data, emailVerified: false, createdAt: new Date() },
+        data: { id: crypto.randomUUID(), ...data, emailVerified: false, failedLoginAttempts: 0, lockedAt: null, createdAt: new Date() },
       }) as Promise<User>
     },
 
@@ -96,6 +100,10 @@ export function createPrismaAdapter(prisma: PrismaClient): DatabaseAdapter {
       return (prisma.session.findUnique({ where: { id: tokenHash } }) as Promise<Session | null>)
     },
 
+    async findSessionById(sessionId) {
+      return (prisma.session.findUnique({ where: { id: sessionId } }) as Promise<Session | null>)
+    },
+
     async updateSessionExpiry(tokenHash, expiresAt) {
       await prisma.session.update({ where: { id: tokenHash }, data: { expiresAt } })
     },
@@ -104,8 +112,16 @@ export function createPrismaAdapter(prisma: PrismaClient): DatabaseAdapter {
       await prisma.session.delete({ where: { id: tokenHash } })
     },
 
+    async deleteSessionById(sessionId) {
+      await prisma.session.delete({ where: { id: sessionId } })
+    },
+
     async deleteAllUserSessions(userId) {
       await prisma.session.deleteMany({ where: { userId } })
+    },
+
+    async findAllUserSessions(userId) {
+      return (prisma.session.findMany({ where: { userId } }) as Promise<Session[]>)
     },
 
     // ── otp tokens ──────────────────────────────────────────
@@ -185,6 +201,24 @@ export function createPrismaAdapter(prisma: PrismaClient): DatabaseAdapter {
 
     async deleteAllBackupCodes(userId) {
       await prisma.backupCode.deleteMany({ where: { userId } })
+    },
+
+    // ── refresh tokens ───────────────────────────────────────
+
+    async createRefreshToken(data) {
+      await prisma.refreshToken.create({ data })
+    },
+
+    async findRefreshToken(id) {
+      return (prisma.refreshToken.findUnique({ where: { id } }) as Promise<RefreshToken | null>)
+    },
+
+    async deleteRefreshToken(id) {
+      await prisma.refreshToken.delete({ where: { id } })
+    },
+
+    async deleteExpiredRefreshTokens() {
+      await prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: new Date() } } })
     },
   }
 }
