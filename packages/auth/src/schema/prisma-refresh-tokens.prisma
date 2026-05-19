@@ -1,0 +1,15 @@
+// ── Refresh tokens table ───────────────────────────────────────
+// Stamped when jwt feature is selected.
+// Also add `refreshTokens RefreshToken[]` to your User model relations
+// and `refreshTokens RefreshToken[]` to your Session model relations.
+
+model RefreshToken {
+  id        String   @id              // hashed token — lookup key
+  userId    String
+  sessionId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}

@@ -9,6 +9,10 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   passwordHash: text('password_hash'),
+  /** Consecutive failed login attempts. Reset to 0 on success. */
+  failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+  /** If locked, the timestamp when the lock expires. Null = not locked. */
+  lockedAt: timestamp('locked_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -19,6 +23,7 @@ export const sessions = pgTable('sessions', {
     .references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   fresh: boolean('fresh').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const otpTokens = pgTable('otp_tokens', {
@@ -57,6 +62,18 @@ export const backupCodes = pgTable('backup_codes', {
   usedAt: timestamp('used_at', { withTimezone: true }),
 })
 
+export const refreshTokens = pgTable('refresh_tokens', {
+  id: text('id').primaryKey(),          // hashed token — lookup key
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const authSchema = {
   users,
   sessions,
@@ -64,4 +81,5 @@ export const authSchema = {
   oauthAccounts,
   totpCredentials,
   backupCodes,
+  refreshTokens,
 }

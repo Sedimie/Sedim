@@ -7,6 +7,8 @@ export const users = mysqlTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   passwordHash: text('password_hash'),
+  failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+  lockedAt: datetime('locked_at'),
   createdAt: datetime('created_at').notNull(),
 })
 
@@ -15,6 +17,7 @@ export const sessions = mysqlTable('sessions', {
   userId: text('user_id').notNull(),
   expiresAt: datetime('expires_at').notNull(),
   fresh: boolean('fresh').notNull().default(true),
+  createdAt: datetime('created_at').notNull(),
 })
 
 export const otpTokens = mysqlTable('otp_tokens', {
@@ -45,6 +48,14 @@ export const backupCodes = mysqlTable('backup_codes', {
   usedAt: datetime('used_at'),
 })
 
+export const refreshTokens = mysqlTable('refresh_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  expiresAt: datetime('expires_at').notNull(),
+  createdAt: datetime('created_at').notNull(),
+})
+
 export const authSchema = {
   users,
   sessions,
@@ -52,4 +63,5 @@ export const authSchema = {
   oauthAccounts,
   totpCredentials,
   backupCodes,
+  refreshTokens,
 }

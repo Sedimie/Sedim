@@ -18,6 +18,7 @@ export type AuthFeature =
   | 'oauth'
   | 'totp'
   | 'password-reset'
+  | 'jwt'
 
 /**
  * Returns the DB table names required for a given set of selected features.
@@ -27,6 +28,7 @@ export type AuthFeature =
  * + magic-link        → + ['otp_tokens']
  * + oauth             → + ['oauth_accounts']
  * + totp              → + ['totp_credentials', 'backup_codes']
+ * + jwt               → + ['refresh_tokens']
  */
 export function getRequiredTables(features: AuthFeature[]): string[] {
   const required = new Set(['users', 'sessions'])
@@ -44,6 +46,9 @@ export function getRequiredTables(features: AuthFeature[]): string[] {
       case 'totp':
         required.add('totp_credentials')
         required.add('backup_codes')
+        break
+      case 'jwt':
+        required.add('refresh_tokens')
         break
       case 'email-password':
         break
