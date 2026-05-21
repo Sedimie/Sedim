@@ -1,7 +1,5 @@
 import { isSedimInitialised } from '../config/index'
 import { detect } from '../detector/index'
-import { verifyAndOverrideDetection } from '../detector/override'
-import { renderPlanSummary } from '../planning/diff-renderer'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
@@ -10,7 +8,7 @@ import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { loadPlanConfig } from '../thinker/load-plan-config'
 
 export async function runPlan(moduleName: string): Promise<void> {
-  ui.showIntro(`plan ${moduleName}`)
+  ui.showBanner(`plan ${moduleName}`)
 
   const projectRoot = await ensureProjectRoot()
 
@@ -31,7 +29,6 @@ export async function runPlan(moduleName: string): Promise<void> {
   }
 
   ui.showDetectionSummary(ctx)
-  ctx = await verifyAndOverrideDetection(ctx)
 
   let manifest: ModuleManifest
   const manifestSpinner = ui.createSpinner(`Fetching ${moduleName} manifest...`)
@@ -44,13 +41,43 @@ export async function runPlan(moduleName: string): Promise<void> {
     process.exit(1)
   }
 
-  let plan: InstallPlan
   const planSpinner = ui.createSpinner('Building plan...')
+
+  // Flatten all feature categories from the manifest so plan shows the full possible plan.
+  // plan-config uses selectedFeatures to gate conditional templates (RBAC, JWT, UI, etc.)
+  const allManifestFeatures = [
+    ...(manifest.features.providers ?? []),
+    ...(manifest.features.authorization ?? []),
+    ...(manifest.features.session ?? []),
+    ...(manifest.features.ui ?? []),
+  ]
+
   let planConfig: import('../planning/types').PlanConfig
   try {
-    // use empty selectedFeatures for plan preview — shows full possible plan
-    planConfig = await loadPlanConfig(moduleName, manifest, ctx, [])
-    plan = await buildPlan(ctx, planConfig, [])
+    planConfig = await loadPlanConfig(moduleName, manifest, ctx, allManifestFeatures)
+  } catch (err) {
+    planSpinner.stop('Planning failed')
+    ui.showError(err)
+    process.exit(1)
+  }
+
+  // Fail fast for unsupported stacks — don't build a plan we can't use
+  const unsupported = (planConfig as unknown as Record<string, unknown>)['_unsupportedReasons'] as
+    | string[]
+    | undefined
+  if (unsupported?.length) {
+    planSpinner.stop('Unsupported stack')
+    for (const reason of unsupported) {
+      ui.logError(reason)
+    }
+    ui.showCancel(
+      'Cannot proceed — use a supported stack (Next.js, Express, or Hono with Drizzle or Prisma).',
+    )
+  }
+
+  let plan: InstallPlan
+  try {
+    plan = await buildPlan(ctx, planConfig, allManifestFeatures)
     planSpinner.stop('Plan ready')
   } catch (err) {
     planSpinner.stop('Planning failed')
@@ -58,18 +85,6 @@ export async function runPlan(moduleName: string): Promise<void> {
     process.exit(1)
   }
 
-  // surface unsupported stack warnings — plan still shows so user can see what would happen
-  const unsupported = (planConfig as unknown as Record<string, unknown>)['_unsupportedReasons'] as
-    | string[]
-    | undefined
-  if (unsupported?.length) {
-    for (const reason of unsupported) {
-      ui.logWarn(reason)
-    }
-    ui.logNote('This stack is not supported. Plan shown for reference only.', 'Unsupported Stack')
-  }
-
   ui.showPlanSummary(plan)
-  ui.logNote(renderPlanSummary(plan), 'Plain Text Summary')
   ui.showOutro('No files written — this was a plan preview only.')
 }

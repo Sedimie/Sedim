@@ -50,6 +50,9 @@ export async function runDiff(moduleName: string): Promise<void> {
 
   ui.logSection('File Diffs')
 
+  // ── modified files ─────────────────────────────────────────
+  const diffTargets: Array<{ path: string; before: string; after: string }> = []
+
   for (const file of plan.filesToModify) {
     const filePath = path.join(projectRoot, file.path)
     if (await exists(filePath)) {
@@ -60,22 +63,25 @@ export async function runDiff(moduleName: string): Promise<void> {
         try {
           after = applyInjection(after, injection)
         } catch {
-          // If anchor fails, gracefully show it in the diff as a failure or skip.
           ui.logWarn(
             `Could not simulate injection in ${file.path} for diff preview (anchor not found)`,
           )
         }
       }
-      ui.showDiff(file.path, before, after)
+      diffTargets.push({ path: file.path, before, after })
     }
   }
 
   for (const file of plan.filesToCreate) {
     if (file.content) {
-      ui.showDiff(file.path, '', file.content)
+      diffTargets.push({ path: file.path, before: '', after: file.content })
     } else {
       ui.logInfo(`+ ${file.path} (new file — content generated at write time)`)
     }
+  }
+
+  if (diffTargets.length > 0) {
+    await ui.showDiffs(diffTargets)
   }
 
   ui.showOutro('No files written — this was a diff preview only.')
