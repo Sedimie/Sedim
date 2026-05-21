@@ -1,6 +1,6 @@
 {
   "name": "@sedim/auth",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Auth module for sedim — stamps production-ready auth into your project",
   "type": "module",
   "main": "./src/index.ts",
@@ -15,9 +15,9 @@
   "scripts": {
     "test": "vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["auth", "typescript", "nodejs", "express", "nextjs", "hono", "oauth", "totp", "rbac"],
+  "author": "Sedim <hello@sedim.dev>",
+  "license": "MIT",
   "dependencies": {
     "@oslojs/crypto": "^1.0.1",
     "@oslojs/encoding": "^1.1.0",

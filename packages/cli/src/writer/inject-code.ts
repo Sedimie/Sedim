@@ -29,6 +29,8 @@ export async function injectCode(
 
     const injected = applyInjection(content, action)
 
+    if (injected === content) return 'skipped' // no change — payload already present
+
     await writeText(absPath, injected)
     return 'injected'
   } catch (err) {
