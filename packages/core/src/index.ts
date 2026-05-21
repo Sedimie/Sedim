@@ -21,6 +21,7 @@ export type {
   CodeArchitecture,
   ConflictSignals,
   DetectedContext,
+  DetectedFrontend,
   // plan
   FileToCreate,
   FileToModify,

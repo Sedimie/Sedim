@@ -75,6 +75,14 @@ export interface ConflictSignals {
 
 // ── DetectedContext ───────────────────────────────────────────
 
+export interface DetectedFrontend {
+  name: string
+  absPath: string
+  relPath: string
+  framework: 'react' | 'vue' | 'svelte'
+  buildTool: 'vite' | 'webpack'
+}
+
 export interface DetectedContext {
   projectRoot: string
   packageManager: PackageManager
@@ -88,6 +96,8 @@ export interface DetectedContext {
   codeArchitecture: CodeArchitecture
   runtime: { nodeVersion: string | null }
   conflicts: ConflictSignals
+  /** Detected React/Vite frontend app in the same workspace — for full-stack setups */
+  frontend?: DetectedFrontend
 }
 
 // ── InstallPlan ───────────────────────────────────────────────

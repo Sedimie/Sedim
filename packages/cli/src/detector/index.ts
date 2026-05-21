@@ -7,6 +7,7 @@ import { detectAuthSignals } from './detect-auth-signals'
 import { detectCodeArchitecture } from './detect-code-architecture'
 import { detectDB } from './detect-db'
 import { detectFramework } from './detect-framework'
+import { detectFrontend } from './detect-frontend'
 import { detectLanguage, detectModuleSystem } from './detect-language'
 import { detectORM } from './detect-orm'
 import { detectStructure } from './detect-structure'
@@ -15,19 +16,29 @@ export async function detect(from?: string): Promise<DetectedContext> {
   const projectRoot = await findProjectRoot(from)
 
   // run all detectors in parallel — none depend on each other
-  const [language, moduleSystem, framework, orm, db, structure, schema, codeArchitecture] =
-    await Promise.all([
-      detectLanguage(projectRoot),
-      detectModuleSystem(projectRoot),
-      detectFramework(projectRoot),
-      detectORM(projectRoot),
-      detectDB(projectRoot),
-      detectStructure(projectRoot),
-      detectAuthSignals(projectRoot),
-      detectCodeArchitecture(projectRoot),
-    ]).catch(err => {
-      throw new DetectionError('Detection failed', err)
-    })
+  const [
+    language,
+    moduleSystem,
+    framework,
+    orm,
+    db,
+    structure,
+    schema,
+    codeArchitecture,
+    frontend,
+  ] = await Promise.all([
+    detectLanguage(projectRoot),
+    detectModuleSystem(projectRoot),
+    detectFramework(projectRoot),
+    detectORM(projectRoot),
+    detectDB(projectRoot),
+    detectStructure(projectRoot),
+    detectAuthSignals(projectRoot),
+    detectCodeArchitecture(projectRoot),
+    detectFrontend(projectRoot),
+  ]).catch(err => {
+    throw new DetectionError('Detection failed', err)
+  })
 
   const packageManager = detectPackageManager(projectRoot)
   const nodeVersion = await resolveNodeVersion(projectRoot)
@@ -51,6 +62,7 @@ export async function detect(from?: string): Promise<DetectedContext> {
     codeArchitecture,
     runtime: { nodeVersion },
     conflicts,
+    frontend: frontend ?? undefined,
   }
 }
 
