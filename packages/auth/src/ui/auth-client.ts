@@ -4,12 +4,17 @@
 // Components import from here — not raw fetch.
 // If you change basePath in config.ts, update BASE_PATH here too.
 
-const BASE_PATH =
-  typeof process !== 'undefined' && process.env?.['NEXT_PUBLIC_API_URL']
-    ? `${process.env['NEXT_PUBLIC_API_URL']}/api/auth`
-    : typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL
-      ? `${(import.meta as any).env.VITE_API_URL}/api/auth`
-      : '/api/auth'
+// If you change basePath in config.ts, update BASE_PATH here too.
+// API_BASE_PATH is substituted at stamp time: /api/auth for Next.js, /auth for Express/Hono.
+const BASE_PATH = (() => {
+  if (typeof process !== 'undefined' && process.env?.['NEXT_PUBLIC_API_URL']) {
+    return `${process.env['NEXT_PUBLIC_API_URL']}/api/auth`
+  }
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) {
+    return `${(import.meta as any).env.VITE_API_URL}{{API_BASE_PATH}}`
+  }
+  return '{{API_BASE_PATH}}'
+})()
 
 export interface AuthUser {
   id: string
@@ -40,6 +45,7 @@ export type AuthError =
   | 'backup-code-invalid'
   | 'oauth-provider-unknown'
   | 'account-locked'
+  | 'rate-limited'
   | 'network-error'
   | string
 
@@ -47,11 +53,34 @@ export type AuthResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: AuthError }
 
+// ── CSRF token ──────────────────────────────────────────────────
+
+let _csrfToken: string | null = null
+
+/**
+ * Fetches and caches the CSRF token from the server.
+ * Call this once on app init (e.g., in a root layout or auth provider).
+ */
+export async function loadCsrfToken(): Promise<string | null> {
+  const result = await get<{ token: string }>('/csrf-token')
+  if (result.ok) {
+    _csrfToken = result.data.token
+    return _csrfToken
+  }
+  return null
+}
+
+function csrfHeader(): Record<string, string> {
+  return _csrfToken ? { 'x-csrf-token': _csrfToken } : {}
+}
+
+// ── Internal fetch helpers ───────────────────────────────────────
+
 async function post<T>(path: string, body: unknown): Promise<AuthResult<T>> {
   try {
     const res = await fetch(`${BASE_PATH}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       body: JSON.stringify(body),
       credentials: 'same-origin',
     })
@@ -147,4 +176,36 @@ export async function verifyBackupCode(code: string): Promise<AuthResult<{ user:
 
 export function redirectToOAuth(provider: 'google' | 'github' | 'discord' | string): void {
   window.location.href = `${BASE_PATH}/oauth/${provider}`
+}
+
+// ── JWT refresh ────────────────────────────────────────────────
+
+/**
+ * Refreshes an expired or expiring access token using the httpOnly refresh_token cookie.
+ * The browser never sees the refresh token — it lives in an httpOnly cookie.
+ */
+export async function refreshAccessToken(): Promise<AuthResult<{ ok: true }>> {
+  return post('/refresh', {})
+}
+
+/**
+ * Revokes the refresh token (used on logout for full token cleanup).
+ */
+export async function revokeRefreshToken(): Promise<AuthResult<{ ok: true }>> {
+  return post('/refresh/revoke', {})
+}
+
+// ── Server Components (Next.js App Router) ─────────────────────
+
+/**
+ * Gets the current session in Server Components and Route Handlers.
+ * Reads the session cookie directly — no HTTP round-trip.
+ *
+ * Usage:
+ *   import { getServerSession } from './auth-client'
+ *   const user = await getServerSession()
+ */
+export async function getServerSession(): Promise<AuthUser | null> {
+  const result = await get<{ user: AuthUser | null }>('/session')
+  return result.ok ? result.data.user : null
 }

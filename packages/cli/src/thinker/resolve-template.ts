@@ -63,6 +63,9 @@ export async function resolveTemplate(
         const sourcePath = path.join(packageRoot, relPath)
         if (await exists(sourcePath)) {
           content = await readText(sourcePath)
+          // Apply substitutions to all source files — they may contain
+          // {{VAR}} placeholders that need resolving (e.g. API_BASE_PATH).
+          content = applySubstitutions(content, ctx, selectedFeatures)
         } else {
           content = ''
         }
@@ -146,6 +149,8 @@ function applySubstitutions(
     SIGNUP_PAGE: buildSignupPage(selectedFeatures),
     FORGOT_PAGE: buildForgotPage(selectedFeatures),
     RESET_PAGE: buildResetPage(selectedFeatures),
+    // API base path — /api/auth for Next.js, /auth for Express/Hono
+    API_BASE_PATH: buildApiBasePath(ctx),
   }
 
   return content.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`)
@@ -546,6 +551,18 @@ function buildResetPage(features: string[] = []): string {
     `  )`,
     `}`,
   ].join('\n')
+}
+
+// ── API base path builder ────────────────────────────────────────
+// Determines the API base path for the auth-client.ts template.
+// Next.js: /api/auth (uses NEXT_PUBLIC_API_URL env var)
+// Express/Hono: /auth (uses VITE_API_URL env var)
+
+function buildApiBasePath(ctx: DetectedContext): string {
+  if (ctx.framework.value === 'nextjs') {
+    return '/api/auth'
+  }
+  return '/auth'
 }
 
 // ── DB client file generator ──────────────────────────────────
