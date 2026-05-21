@@ -1,6 +1,7 @@
 // Express types are type-only imports — express lives in the user's project.
 import type { Request, Response, NextFunction, Router, RequestHandler } from 'express'
 import { hashSessionToken } from '../core/generate-token.js'
+import { createRefreshToken } from '../core/jwt.js'
 import type { User } from './types.js'
 import type { Session } from '../core/session.js'
 import type { AuthConfig } from './framework-config.js'
@@ -10,7 +11,9 @@ import {
   createMagicLink, verifyMagicLink, createOAuthRedirect, handleOAuthCallback,
   completeTotpLogin, verifyBackupCode, createPasswordResetToken, confirmPasswordReset,
   listUserSessions, revokeSession, revokeAllSessions,
+  refreshAccessToken, revokeRefreshToken,
 } from './operations.js'
+import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../core/email-transport.js'
 
 // Auth data is attached to res.locals so it doesn't require module augmentation.
 // Access in route handlers: res.locals['authUser'] and res.locals['authSession']
@@ -35,6 +38,10 @@ function getToken(req: Request, c: RC): string | null {
 
 function getCookies(req: Request): Record<string, string> {
   return (req.cookies as Record<string, string> | undefined) ?? {}
+}
+
+function generateCsrfToken(): string {
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url')
 }
 
 function sanitizeUser(user: User): Omit<User, 'passwordHash'> {
@@ -80,11 +87,32 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
   const router: Router = Router()
   const rc = resolveConfig(config)
 
+  // CSRF guard — validates on all mutating requests
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      const cookieToken = (req.cookies as Record<string, string>)['csrf_token']
+      const headerToken = (req.headers['x-csrf-token'] as string) ?? ''
+      if (!cookieToken || cookieToken !== headerToken) {
+        res.status(403).json({ error: 'csrf-invalid' }); return
+      }
+    }
+    next()
+  })
+
+  // GET /csrf-token — returns CSRF token, sets httpOnly cookie
+  router.get('/csrf-token', (_req: Request, res: Response) => {
+    const token = generateCsrfToken()
+    res.cookie('csrf_token', token, { httpOnly: true, secure: rc.secureCookies, sameSite: 'strict', maxAge: 86400, path: '/' })
+    res.setHeader('X-CSRF-Token', token)
+    res.status(200).json({ token })
+  })
+
   router.post('/signup', async (req: Request, res: Response) => {
     const { email, password } = req.body as { email?: string; password?: string }
     if (!email || !password) { res.status(400).json({ error: 'email and password required' }); return }
-    const r = await signupWithPassword(rc.db, email, password)
-    if (!r.ok) { res.status(409).json({ error: r.error }); return }
+    const ip = (req.headers['x-forwarded-for'] as string ?? 'unknown').split(',')[0]?.trim() ?? 'unknown'
+    const r = await signupWithPassword(rc.db, ip, email, password)
+    if (!r.ok) { res.status(r.error === 'rate-limited' ? 429 : 409).json({ error: r.error }); return }
     setSessionCookie(res, r.data.token, r.data.session.expiresAt, rc)
     res.status(201).json({ user: sanitizeUser(r.data.user) })
   })
@@ -92,8 +120,9 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
   router.post('/login', async (req: Request, res: Response) => {
     const { email, password } = req.body as { email?: string; password?: string }
     if (!email || !password) { res.status(400).json({ error: 'email and password required' }); return }
-    const r = await loginWithPassword(rc.db, email, password)
-    if (!r.ok) { res.status(401).json({ error: r.error }); return }
+    const ip = (req.headers['x-forwarded-for'] as string ?? 'unknown').split(',')[0]?.trim() ?? 'unknown'
+    const r = await loginWithPassword(rc.db, ip, email, password)
+    if (!r.ok) { res.status(r.error === 'rate-limited' ? 429 : 401).json({ error: r.error }); return }
     if (r.data.needsTotp) {
       res.cookie('auth_pending_mfa', `pending:${r.data.user.id}`, { httpOnly: true, secure: rc.secureCookies, sameSite: 'lax', maxAge: 300000, path: '/' })
       res.status(200).json({ requiresTotp: true })
@@ -143,9 +172,12 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
   router.post('/magic-link', async (req: Request, res: Response) => {
     const { email } = req.body as { email?: string }
     if (!email) { res.status(400).json({ error: 'email required' }); return }
-    const r = await createMagicLink(rc.db, email)
-    if (!r.ok) { res.status(400).json({ error: r.error }); return }
-    res.status(200).json({ ok: true, token: r.data.token })
+    const ip = (req.headers['x-forwarded-for'] as string ?? 'unknown').split(',')[0]?.trim() ?? 'unknown'
+    const r = await createMagicLink(rc.db, email, ip)
+    if (!r.ok) { res.status(r.error === 'rate-limited' ? 429 : 400).json({ error: r.error }); return }
+    const magicLinkUrl = `${rc.basePath}/magic-link/verify?token=${r.data.token}`
+    sendEmail(buildMagicLinkEmail({ email, magicLinkUrl }), rc.email).catch(console.error)
+    res.status(200).json({ ok: true })
   })
 
   router.get('/magic-link/verify', async (req: Request, res: Response) => {
@@ -185,8 +217,10 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
     const pending = getCookies(req)['auth_pending_mfa']
     const { code } = req.body as { code?: string }
     if (!pending?.startsWith('pending:') || !code) { res.status(400).json({ error: 'invalid request' }); return }
-    const r = await completeTotpLogin(rc.db, rc.secret, pending.replace('pending:', ''), code)
-    if (!r.ok) { res.status(401).json({ error: r.error }); return }
+    const userId = pending.replace('pending:', '')
+    const ip = (req.headers['x-forwarded-for'] as string ?? 'unknown').split(',')[0]?.trim() ?? 'unknown'
+    const r = await completeTotpLogin(rc.db, rc.secret, userId, code, ip)
+    if (!r.ok) { res.status(r.error === 'rate-limited' ? 429 : 401).json({ error: r.error }); return }
     res.clearCookie('auth_pending_mfa', { path: '/' })
     setSessionCookie(res, r.data.token, r.data.session.expiresAt, rc)
     res.status(200).json({ user: sanitizeUser(r.data.user) })
@@ -206,7 +240,11 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
   router.post('/password-reset/request', async (req: Request, res: Response) => {
     const { email } = req.body as { email?: string }
     if (!email) { res.status(400).json({ error: 'email required' }); return }
-    await createPasswordResetToken(rc.db, email)
+    const r = await createPasswordResetToken(rc.db, email)
+    if (r.ok && r.data.token) {
+      const resetUrl = `${rc.basePath}/password-reset/confirm?token=${r.data.token}`
+      sendEmail(buildPasswordResetEmail({ email, resetUrl }), rc.email).catch(console.error)
+    }
     res.status(200).json({ ok: true })
   })
 
@@ -216,6 +254,21 @@ export function createExpressAuthRouter(config: AuthConfig): Router {
     const r = await confirmPasswordReset(rc.db, token, password)
     if (!r.ok) { res.status(400).json({ error: r.error }); return }
     clearSessionCookie(res, rc)
+    res.status(200).json({ ok: true })
+  })
+
+  router.post('/refresh', async (req: Request, res: Response) => {
+    const refreshToken = (req.cookies as Record<string, string>)['refresh_token']
+    if (!refreshToken) { res.status(401).json({ error: 'token-invalid' }); return }
+    const r = await refreshAccessToken(rc.db, refreshToken, rc.secret)
+    if (!r.ok) { res.status(401).json({ error: r.error }); return }
+    res.cookie('access_token', r.data.accessToken, { httpOnly: true, secure: rc.secureCookies, sameSite: 'lax', expires: r.data.expiresAt, path: '/' })
+    res.status(200).json({ ok: true })
+  })
+
+  router.post('/refresh/revoke', async (req: Request, res: Response) => {
+    const refreshToken = (req.cookies as Record<string, string>)['refresh_token']
+    if (refreshToken) await revokeRefreshToken(rc.db, refreshToken)
     res.status(200).json({ ok: true })
   })
 

@@ -2,6 +2,12 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { hashSessionToken } from '../core/generate-token.js'
+import { createRefreshToken } from '../core/jwt.js'
+import { encodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
+
+function generateCsrfToken(): string {
+  return encodeBase32LowerCaseNoPadding(crypto.getRandomValues(new Uint8Array(32)))
+}
 import type { User } from './types.js'
 import type { Session } from '../core/session.js'
 import type { AuthConfig } from './framework-config.js'
@@ -22,7 +28,10 @@ import {
   listUserSessions,
   revokeSession,
   revokeAllSessions,
+  refreshAccessToken,
+  revokeRefreshToken,
 } from './operations.js'
+import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../core/email-transport.js'
 
 // ── Cookie helpers ────────────────────────────────────────────
 
@@ -67,6 +76,21 @@ export async function getSession(
   return validateRequest(resolved.db, token)
 }
 
+/**
+ * Lightweight session getter for Server Components — no HTTP round-trip.
+ * Uses cookies() directly and calls validateRequest against the DB.
+ *
+ * Usage in a Server Component:
+ *   import { getServerSession } from './auth-client'
+ *   const user = await getServerSession(authConfig)
+ */
+export async function getServerSession(config: AuthConfig): Promise<User | null> {
+  const resolved = resolveConfig(config)
+  const token = await getSessionToken(resolved)
+  const result = await validateRequest(resolved.db, token)
+  return result ? sanitizeUser(result.user) : null
+}
+
 // ── Route handler factory ─────────────────────────────────────
 
 /**
@@ -96,6 +120,18 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
       const result = await validateRequest(resolved.db, token)
       if (!result) return NextResponse.json({ user: null }, { status: 401 })
       return NextResponse.json({ user: sanitizeUser(result.user) })
+    }
+
+    // GET /api/auth/csrf-token — returns CSRF token, sets httpOnly cookie
+    if (path === 'csrf-token') {
+      const token = generateCsrfToken()
+      const response = NextResponse.json({ token })
+      response.cookies.set('csrf_token', token, {
+        httpOnly: true, secure: resolved.secureCookies, sameSite: 'strict',
+        maxAge: 86400, path: '/',
+      })
+      response.headers.set('X-CSRF-Token', token)
+      return response
     }
 
     // GET /api/auth/sessions — list all sessions for the current user
@@ -172,14 +208,27 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
     const path = all.join('/')
     const body = await req.json().catch(() => ({})) as Record<string, unknown>
 
+    // CSRF guard — strict same-site for mutating requests
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      const cookieToken = req.cookies.get('csrf_token')?.value
+      const headerToken = req.headers.get('x-csrf-token') ?? ''
+      if (!cookieToken || cookieToken !== headerToken) {
+        return NextResponse.json({ error: 'csrf-invalid' }, { status: 403 })
+      }
+    }
+
     // POST /api/auth/signup
     if (path === 'signup') {
       const { email, password } = body as { email?: string; password?: string }
       if (!email || !password) {
         return NextResponse.json({ error: 'email and password required' }, { status: 400 })
       }
-      const result = await signupWithPassword(resolved.db, email, password)
-      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 409 })
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const result = await signupWithPassword(resolved.db, ip, email, password)
+      if (!result.ok) {
+        const status = result.error === 'rate-limited' ? 429 : 409
+        return NextResponse.json({ error: result.error }, { status })
+      }
 
       await setSessionCookie(result.data.token, result.data.session.expiresAt, resolved)
       return NextResponse.json({ user: sanitizeUser(result.data.user) }, { status: 201 })
@@ -191,8 +240,12 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
       if (!email || !password) {
         return NextResponse.json({ error: 'email and password required' }, { status: 400 })
       }
-      const result = await loginWithPassword(resolved.db, email, password)
-      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 })
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const result = await loginWithPassword(resolved.db, ip, email, password)
+      if (!result.ok) {
+        const status = result.error === 'rate-limited' ? 429 : 401
+        return NextResponse.json({ error: result.error }, { status })
+      }
 
       if (result.data.needsTotp) {
         const response = NextResponse.json({ requiresTotp: true })
@@ -218,10 +271,14 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
     if (path === 'magic-link') {
       const { email } = body as { email?: string }
       if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
-      const result = await createMagicLink(resolved.db, email)
-      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
-      // return token so caller can send email — don't expose in production response
-      return NextResponse.json({ ok: true, token: result.data.token })
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const result = await createMagicLink(resolved.db, email, ip)
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.error === 'rate-limited' ? 429 : 400 })
+      }
+      const magicLinkUrl = `${resolved.basePath}/magic-link/verify?token=${result.data.token}`
+      sendEmail(buildMagicLinkEmail({ email, magicLinkUrl }), resolved.email).catch(console.error)
+      return NextResponse.json({ ok: true })
     }
 
     // POST /api/auth/totp/verify
@@ -232,8 +289,12 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
         return NextResponse.json({ error: 'invalid request' }, { status: 400 })
       }
       const userId = pendingCookie.replace('pending:', '')
-      const result = await completeTotpLogin(resolved.db, resolved.secret, userId, code)
-      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 })
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const result = await completeTotpLogin(resolved.db, resolved.secret, userId, code, ip)
+      if (!result.ok) {
+        const status = result.error === 'rate-limited' ? 429 : 401
+        return NextResponse.json({ error: result.error }, { status })
+      }
 
       const response = NextResponse.json({ user: sanitizeUser(result.data.user) })
       response.cookies.delete('auth_pending_mfa')
@@ -268,7 +329,11 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
     if (path === 'password-reset/request') {
       const { email } = body as { email?: string }
       if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 })
-      await createPasswordResetToken(resolved.db, email)
+      const result = await createPasswordResetToken(resolved.db, email)
+      if (result.ok && result.data.token) {
+        const resetUrl = `${resolved.basePath}/password-reset/confirm?token=${result.data.token}`
+        sendEmail(buildPasswordResetEmail({ email, resetUrl }), resolved.email).catch(console.error)
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -305,6 +370,27 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
 
       await revokeAllSessions(resolved.db, sessionResult.user.id)
       await clearSessionCookie(resolved)
+      return NextResponse.json({ ok: true })
+    }
+
+    // POST /api/auth/refresh — rotate JWT access token using refresh token cookie
+    if (path === 'refresh') {
+      const refreshToken = req.cookies.get('refresh_token')?.value
+      if (!refreshToken) return NextResponse.json({ error: 'token-invalid' }, { status: 401 })
+      const result = await refreshAccessToken(resolved.db, refreshToken, resolved.secret)
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 401 })
+      const response = NextResponse.json({ ok: true })
+      response.cookies.set('access_token', result.data.accessToken, {
+        httpOnly: true, secure: resolved.secureCookies, sameSite: 'lax',
+        expires: result.data.expiresAt, path: '/',
+      })
+      return response
+    }
+
+    // POST /api/auth/refresh/revoke — invalidate the refresh token (called on logout)
+    if (path === 'refresh/revoke') {
+      const refreshToken = req.cookies.get('refresh_token')?.value
+      if (refreshToken) await revokeRefreshToken(resolved.db, refreshToken)
       return NextResponse.json({ ok: true })
     }
 

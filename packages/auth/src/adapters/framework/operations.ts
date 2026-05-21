@@ -3,6 +3,9 @@ import { generateSessionToken, hashSessionToken, generateOtpToken, hashBackupCod
 import { buildSession, validateSession } from '../core/session.js'
 import { generatePkcePair, buildAuthorizationUrl } from '../core/pkce.js'
 import { verifyTotpCode, buildTotpUri } from '../core/totp.js'
+import { createAccessToken, hashRefreshToken, ACCESS_TOKEN_TTL_MS } from '../core/jwt.js'
+import { requireRole, hasPermission, hasMinimumRole, type Action, type Resource } from '../core/rbac.js'
+import { evaluateAbac, type AbacPolicy, type AbacContext, type SubjectAttributes, type ResourceAttributes } from '../core/abac.js'
 import type { DatabaseAdapter, User } from './types.js'
 import type { Session } from '../core/session.js'
 import type { ResolvedAuthConfig, OAuthProfile } from './framework-config.js'
@@ -27,16 +30,101 @@ export type AuthError =
   | 'oauth-provider-unknown'
   | 'oauth-exchange-failed'
   | 'account-locked'
+  | 'rate-limited'
+
+// ── Signup ────────────────────────────────────────────────────
+
+// ── Rate limiter — sliding window, in-memory (swap for Redis in prod) ────
+
+interface RateLimitEntry {
+  count: number
+  oldest: number
+  blockedUntil: number | null
+}
+
+type RateLimitStore = Map<string, RateLimitEntry>
+
+function createRateLimiter(maxAttempts: number, windowMs: number, blockMs: number) {
+  const store: RateLimitStore = new Map()
+
+  return {
+    check(key: string): { allowed: boolean; retryAfterMs?: number } {
+      const now = Date.now()
+      const entry = store.get(key)
+
+      if (!entry) return { allowed: true }
+
+      if (entry.blockedUntil !== null && now < entry.blockedUntil) {
+        return { allowed: false, retryAfterMs: entry.blockedUntil - now }
+      }
+
+      if (now - entry.oldest > windowMs) {
+        if (entry.count === 1) {
+          store.delete(key)
+          return { allowed: true }
+        }
+        entry.count = 0
+        entry.oldest = now
+        entry.blockedUntil = null
+        store.set(key, entry)
+        return { allowed: true }
+      }
+
+      if (entry.count >= maxAttempts) {
+        entry.blockedUntil = now + blockMs
+        store.set(key, entry)
+        return { allowed: false, retryAfterMs: blockMs }
+      }
+
+      return { allowed: true }
+    },
+    hit(key: string) {
+      const now = Date.now()
+      const entry = store.get(key)
+      if (!entry || now - entry.oldest > windowMs) {
+        store.set(key, { count: 1, oldest: now, blockedUntil: null })
+        return
+      }
+      entry.count++
+      store.set(key, entry)
+    },
+    clear(key: string) {
+      store.delete(key)
+    },
+  }
+}
+
+const loginLimiter = createRateLimiter(5, 15 * 60 * 1000, 15 * 60 * 1000)
+const signupLimiter = createRateLimiter(5, 15 * 60 * 1000, 15 * 60 * 1000)
+const emailLimiter = createRateLimiter(3, 15 * 60 * 1000, 15 * 60 * 1000)
+const totpLimiter = createRateLimiter(5, 5 * 60 * 1000, 5 * 60 * 1000)
+
+function loginKey(ip: string, email: string) { return `login:${ip}:${email.toLowerCase()}` }
+function emailKey(email: string) { return `email:${email.toLowerCase()}` }
+function totpKey(userId: string) { return `totp:${userId}` }
+
+// ── Lockout constants ──────────────────────────────────────────
+const MAX_FAILED_ATTEMPTS = 10
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000 // 15 minutes
 
 // ── Signup ────────────────────────────────────────────────────
 
 export async function signupWithPassword(
   db: DatabaseAdapter,
   email: string,
+  ip: string,
   password: string,
 ): Promise<AuthResult<{ user: User; token: string; session: Session }>> {
+  const limited = signupLimiter.check(loginKey(ip, email))
+  if (!limited.allowed) {
+    return { ok: false, error: 'rate-limited' }
+  }
+
   const existing = await db.findUserByEmail(email)
-  if (existing) return { ok: false, error: 'email-taken' }
+  if (existing) {
+    signupLimiter.hit(loginKey(ip, email))
+    return { ok: false, error: 'email-taken' }
+  }
 
   const passwordHash = await hashPassword(password)
   const user = await db.createUser({ email, passwordHash })
@@ -45,22 +133,28 @@ export async function signupWithPassword(
   const session = buildSession(hashSessionToken(token), user.id)
   await db.createSession(session)
 
+  signupLimiter.clear(loginKey(ip, email))
   return { ok: true, data: { user, token, session } }
 }
-
-// ── Lockout constants ──────────────────────────────────────────
-const MAX_FAILED_ATTEMPTS = 10
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000 // 15 minutes
 
 // ── Login ─────────────────────────────────────────────────────
 
 export async function loginWithPassword(
   db: DatabaseAdapter,
+  ip: string,
   email: string,
   password: string,
 ): Promise<AuthResult<{ user: User; token: string; session: Session; needsTotp: boolean }>> {
+  const limited = loginLimiter.check(loginKey(ip, email))
+  if (!limited.allowed) {
+    return { ok: false, error: 'rate-limited' }
+  }
+
   const user = await db.findUserByEmail(email)
-  if (!user || !user.passwordHash) return { ok: false, error: 'invalid-credentials' }
+  if (!user || !user.passwordHash) {
+    loginLimiter.hit(loginKey(ip, email))
+    return { ok: false, error: 'invalid-credentials' }
+  }
 
   // Check account lockout
   if (user.lockedAt !== null && user.lockedAt.getTime() > Date.now()) {
@@ -69,10 +163,9 @@ export async function loginWithPassword(
 
   const valid = await verifyPassword(user.passwordHash, password)
   if (!valid) {
+    loginLimiter.hit(loginKey(ip, email))
     const attempts = (user.failedLoginAttempts ?? 0) + 1
-    const updates: Partial<Pick<User, 'failedLoginAttempts' | 'lockedAt'>> = {
-      failedLoginAttempts: attempts,
-    }
+    const updates: Partial<Pick<User, 'failedLoginAttempts' | 'lockedAt'>> = { failedLoginAttempts: attempts }
     if (attempts >= MAX_FAILED_ATTEMPTS) {
       updates.lockedAt = new Date(Date.now() + LOCKOUT_DURATION_MS)
     }
@@ -82,10 +175,7 @@ export async function loginWithPassword(
 
   // Successful login — reset lockout counters
   if (user.failedLoginAttempts > 0 || user.lockedAt !== null) {
-    await db.updateUser(user.id, {
-      failedLoginAttempts: 0,
-      lockedAt: null,
-    })
+    await db.updateUser(user.id, { failedLoginAttempts: 0, lockedAt: null })
   }
 
   // silently rehash if parameters have been upgraded
@@ -96,9 +186,6 @@ export async function loginWithPassword(
 
   const totp = await db.findTotpCredential(user.id)
   if (totp) {
-    // TOTP is enabled — don't create a full session yet.
-    // Return needsTotp: true so the framework adapter can issue a
-    // short-lived "pending MFA" token instead of a full session cookie.
     return { ok: true, data: { user, token: '', session: {} as Session, needsTotp: true } }
   }
 
@@ -106,6 +193,7 @@ export async function loginWithPassword(
   const session = buildSession(hashSessionToken(token), user.id)
   await db.createSession(session)
 
+  loginLimiter.clear(loginKey(ip, email))
   return { ok: true, data: { user, token, session, needsTotp: false } }
 }
 
@@ -151,7 +239,14 @@ export async function validateRequest(
 export async function createMagicLink(
   db: DatabaseAdapter,
   email: string,
+  ip?: string,
 ): Promise<AuthResult<{ token: string; userId: string }>> {
+  if (ip) {
+    const limited = emailLimiter.check(emailKey(email))
+    if (!limited.allowed) return { ok: false, error: 'rate-limited' }
+    emailLimiter.hit(emailKey(email))
+  }
+
   let user = await db.findUserByEmail(email)
 
   // create account if it doesn't exist — magic link is also signup
@@ -171,6 +266,7 @@ export async function createMagicLink(
     expiresAt: new Date(Date.now() + 1000 * 60 * 15), // 15 minutes
   })
 
+  if (ip) emailLimiter.clear(emailKey(email))
   return { ok: true, data: { token, userId: user.id } }
 }
 
@@ -233,8 +329,11 @@ export async function handleOAuthCallback(
   const provider = config.providerMap.get(providerId)
   if (!provider) return { ok: false, error: 'oauth-provider-unknown' }
 
-  // exchange code for access token
+  const isOIDC = Boolean(provider.discoveryUrl)
+
+  // exchange code for access token (+ id_token if OIDC)
   let accessToken: string
+  let idToken: string | undefined
   try {
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -254,11 +353,58 @@ export async function handleOAuthCallback(
     if (!res.ok) return { ok: false, error: 'oauth-exchange-failed' }
     const data = await res.json() as Record<string, unknown>
     accessToken = String(data['access_token'])
+    if (isOIDC) idToken = String(data['id_token'] ?? '')
   } catch {
     return { ok: false, error: 'oauth-exchange-failed' }
   }
 
-  // fetch user profile from provider
+  // ── OIDC path: validate id_token, extract claims ───────────────
+  if (isOIDC && idToken && provider.discoveryUrl) {
+    const { validateIdToken, extractEmailFromClaims, hasOIDC } = await import('../core/oidc.js')
+    const clientId = provider.oidcClientId ?? provider.clientId
+
+    let claims: Awaited<ReturnType<typeof validateIdToken>>
+    try {
+      claims = await validateIdToken(idToken, provider.discoveryUrl, clientId)
+    } catch {
+      return { ok: false, error: 'oauth-exchange-failed' }
+    }
+
+    const emailData = extractEmailFromClaims(claims)
+    const email = emailData?.email ?? String(claims.sub)
+    const emailVerified = emailData?.emailVerified ?? false
+
+    // find or create user using OIDC claims
+    let user: User
+    const existingAccount = await db.findOAuthAccount(providerId, String(claims.sub))
+
+    if (existingAccount) {
+      const found = await db.findUserById(existingAccount.userId)
+      if (!found) return { ok: false, error: 'user-not-found' }
+      user = found
+    } else {
+      const existingUser = await db.findUserByEmail(email)
+      if (existingUser) {
+        user = existingUser
+      } else {
+        user = await db.createUser({ email, passwordHash: null })
+        if (emailVerified) await db.updateUser(user.id, { emailVerified: true })
+      }
+      await db.createOAuthAccount({
+        providerId,
+        providerUserId: String(claims.sub),
+        userId: user.id,
+      })
+    }
+
+    const sessionToken = generateSessionToken()
+    const session = buildSession(hashSessionToken(sessionToken), user.id)
+    await db.createSession(session)
+
+    return { ok: true, data: { user, token: sessionToken, session } }
+  }
+
+  // ── vanilla OAuth path: use userinfo endpoint ────────────────────
   let profile: OAuthProfile
   try {
     const res = await fetch(provider.userinfoUrl, {
@@ -355,17 +501,24 @@ export async function completeTotpLogin(
   authSecret: string,
   userId: string,
   code: string,
+  ip?: string,
 ): Promise<AuthResult<{ user: User; token: string; session: Session }>> {
+  if (ip) {
+    const limited = totpLimiter.check(totpKey(userId))
+    if (!limited.allowed) return { ok: false, error: 'rate-limited' }
+    totpLimiter.hit(totpKey(userId))
+  }
+
   const credential = await db.findTotpCredential(userId)
-  if (!credential) return { ok: false, error: 'totp-not-enabled' }
+  if (!credential) { if (ip) totpLimiter.clear(totpKey(userId)); return { ok: false, error: 'totp-not-enabled' } }
 
   // Decrypt the stored secret before verifying
   const { decryptTotpSecret } = await import('../../core/totp-crypto.js')
   const secret = decryptTotpSecret(credential.secret, authSecret)
-  if (!secret) return { ok: false, error: 'totp-invalid' }
+  if (!secret) { if (ip) totpLimiter.clear(totpKey(userId)); return { ok: false, error: 'totp-invalid' } }
 
   const { valid, usedCounter } = verifyTotpCode(secret, code)
-  if (!valid) return { ok: false, error: 'totp-invalid' }
+  if (!valid) { if (ip) totpLimiter.clear(totpKey(userId)); return { ok: false, error: 'totp-invalid' } }
 
   // reject replay within drift window
   if (usedCounter !== null && credential.lastUsedCounter !== null && usedCounter <= credential.lastUsedCounter) {
@@ -376,6 +529,7 @@ export async function completeTotpLogin(
     await db.updateTotpLastUsedCounter(userId, usedCounter)
   }
 
+  if (ip) totpLimiter.clear(totpKey(userId))
   const user = await db.findUserById(userId)
   if (!user) return { ok: false, error: 'user-not-found' }
 
@@ -412,6 +566,13 @@ export async function verifyBackupCode(
 
 // ── Session revocation ─────────────────────────────────────────
 
+export interface SessionInfo {
+  id: string
+  expiresAt: Date
+  fresh: boolean
+  createdAt: Date
+}
+
 export async function revokeSession(
   db: DatabaseAdapter,
   sessionId: string,
@@ -426,11 +587,21 @@ export async function revokeAllSessions(
   await db.deleteAllUserSessions(userId)
 }
 
+/**
+ * Returns safe session metadata — never the token hash.
+ * The raw Session.id is the token hash, so we strip it.
+ */
 export async function listUserSessions(
   db: DatabaseAdapter,
   userId: string,
-): Promise<Session[]> {
-  return db.findAllUserSessions(userId)
+): Promise<SessionInfo[]> {
+  const sessions = await db.findAllUserSessions(userId)
+  return sessions.map(s => ({
+    id: s.id,
+    expiresAt: s.expiresAt,
+    fresh: s.fresh,
+    createdAt: s.createdAt,
+  }))
 }
 
 // ── Password reset ────────────────────────────────────────────
@@ -481,4 +652,82 @@ export async function confirmPasswordReset(
   await db.deleteAllUserSessions(otp.userId)
 
   return { ok: true, data: { user } }
+}
+
+// ── JWT refresh ─────────────────────────────────────────────────
+
+export async function refreshAccessToken(
+  db: DatabaseAdapter,
+  rawRefreshToken: string,
+  authSecret: string,
+): Promise<AuthResult<{ accessToken: string; expiresAt: Date }>> {
+  const tokenHash = hashRefreshToken(rawRefreshToken)
+  const record = await db.findRefreshToken(tokenHash)
+  if (!record) return { ok: false, error: 'token-invalid' }
+  if (record.expiresAt < new Date()) {
+    await db.deleteRefreshToken(tokenHash)
+    return { ok: false, error: 'token-expired' }
+  }
+
+  // verify the session still exists and is valid
+  const session = await db.findSession(record.sessionId)
+  if (!session || session.expiresAt < new Date()) {
+    await db.deleteRefreshToken(tokenHash)
+    return { ok: false, error: 'token-invalid' }
+  }
+
+  const accessToken = createAccessToken(record.userId, record.sessionId, authSecret)
+  return { ok: true, data: { accessToken, expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS) } }
+}
+
+export async function revokeRefreshToken(
+  db: DatabaseAdapter,
+  rawRefreshToken: string,
+): Promise<void> {
+  await db.deleteRefreshToken(hashRefreshToken(rawRefreshToken))
+}
+
+// ── RBAC middleware factory ─────────────────────────────────────
+
+/**
+ * Creates a route guard that requires one of the given roles.
+ *
+ * Usage in a route handler:
+ *   const user = c.var.user  // from session middleware
+ *   const check = requirePermission(user, { roles: ['admin'] })
+ *   if (!check.allowed) return c.json({ error: 'forbidden' }, 403)
+ */
+export function requirePermission(
+  user: User,
+  opts: { roles?: string[]; action?: Action; resource?: Resource },
+): { allowed: boolean } {
+  if (!user) return { allowed: false }
+  if (opts.roles?.length) {
+    if (!requireRole(user, ...opts.roles)) return { allowed: false }
+  }
+  if (opts.action && opts.resource) {
+    if (!hasPermission(user, opts.action, opts.resource)) return { allowed: false }
+  }
+  return { allowed: true }
+}
+
+// ── ABAC middleware factory ───────────────────────────────────────
+
+/**
+ * Creates a route guard that evaluates ABAC policies.
+ *
+ * Usage in a route handler:
+ *   const check = requireAbac(user, { role: 'admin' }, { type: 'post' }, 'delete')
+ *   if (!check.allowed) return c.json({ error: 'forbidden' }, 403)
+ */
+export function requireAbac(
+  user: User,
+  subjectAttrs: SubjectAttributes,
+  resourceAttrs: ResourceAttributes,
+  action: string,
+  policies: AbacPolicy[],
+  context?: AbacContext,
+): AbacResult {
+  if (!user) return { allowed: false, reason: 'no-user' }
+  return evaluateAbac(policies, { ...subjectAttrs, role: (user as any)['role'] ?? 'user' }, resourceAttrs, action, context)
 }

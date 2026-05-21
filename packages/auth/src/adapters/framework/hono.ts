@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 import { hashSessionToken } from '../core/generate-token.js'
+import { encodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
 import type { User } from './types.js'
 import type { Session } from '../core/session.js'
 import type { AuthConfig } from './framework-config.js'
@@ -21,7 +22,10 @@ import {
   listUserSessions,
   revokeSession,
   revokeAllSessions,
+  refreshAccessToken,
+  revokeRefreshToken,
 } from './operations.js'
+import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../core/email-transport.js'
 
 // Hono context variable types
 type AuthVariables = {
@@ -76,6 +80,10 @@ export const requireAuth: MiddlewareHandler<{ Variables: AuthVariables }> = asyn
   await next()
 }
 
+function generateCsrfToken(): string {
+  return encodeBase32LowerCaseNoPadding(crypto.getRandomValues(new Uint8Array(32)))
+}
+
 // ── Route factory ─────────────────────────────────────────────
 
 /**
@@ -93,13 +101,33 @@ export function createHonoAuthRoutes(config: AuthConfig) {
   const app = new Hono<{ Variables: AuthVariables }>()
   const resolved = resolveConfig(config)
 
+  // CSRF guard — validates on all mutating requests
+  app.use('*', async (c, next) => {
+    if (['POST', 'PUT', 'DELETE'].includes(c.req.method)) {
+      const cookieToken = getCookie(c, 'csrf_token')
+      const headerToken = c.req.header('x-csrf-token') ?? ''
+      if (!cookieToken || cookieToken !== headerToken) {
+        return c.json({ error: 'csrf-invalid' }, 403)
+      }
+    }
+    await next()
+  })
+
+  // GET /csrf-token — returns CSRF token, sets httpOnly cookie
+  app.get('/csrf-token', (c) => {
+    const token = generateCsrfToken()
+    setCookie(c, 'csrf_token', token, { httpOnly: true, secure: resolved.secureCookies, sameSite: 'Strict', maxAge: 86400, path: '/' })
+    c.header('X-CSRF-Token', token)
+    return c.json({ token })
+  })
+
   // POST /signup
   app.post('/signup', async (c) => {
     const { email, password } = await c.req.json<{ email?: string; password?: string }>()
     if (!email || !password) return c.json({ error: 'email and password required' }, 400)
-
-    const result = await signupWithPassword(resolved.db, email, password)
-    if (!result.ok) return c.json({ error: result.error }, 409)
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const result = await signupWithPassword(resolved.db, ip, email, password)
+    if (!result.ok) return c.json({ error: result.error }, result.error === 'rate-limited' ? 429 : 409)
 
     setSessionCookie(c, result.data.token, result.data.session.expiresAt, resolved)
     return c.json({ user: sanitizeUser(result.data.user) }, 201)
@@ -109,9 +137,9 @@ export function createHonoAuthRoutes(config: AuthConfig) {
   app.post('/login', async (c) => {
     const { email, password } = await c.req.json<{ email?: string; password?: string }>()
     if (!email || !password) return c.json({ error: 'email and password required' }, 400)
-
-    const result = await loginWithPassword(resolved.db, email, password)
-    if (!result.ok) return c.json({ error: result.error }, 401)
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const result = await loginWithPassword(resolved.db, ip, email, password)
+    if (!result.ok) return c.json({ error: result.error }, result.error === 'rate-limited' ? 429 : 401)
 
     if (result.data.needsTotp) {
       setCookie(c, 'auth_pending_mfa', `pending:${result.data.user.id}`, {
@@ -174,9 +202,12 @@ export function createHonoAuthRoutes(config: AuthConfig) {
   app.post('/magic-link', async (c) => {
     const { email } = await c.req.json<{ email?: string }>()
     if (!email) return c.json({ error: 'email required' }, 400)
-    const result = await createMagicLink(resolved.db, email)
-    if (!result.ok) return c.json({ error: result.error }, 400)
-    return c.json({ ok: true, token: result.data.token })
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const result = await createMagicLink(resolved.db, email, ip)
+    if (!result.ok) return c.json({ error: result.error }, result.error === 'rate-limited' ? 429 : 400)
+    const magicLinkUrl = `${resolved.basePath}/magic-link/verify?token=${result.data.token}`
+    sendEmail(buildMagicLinkEmail({ email, magicLinkUrl }), resolved.email).catch(console.error)
+    return c.json({ ok: true })
   })
 
   // GET /magic-link/verify?token=...
@@ -233,8 +264,9 @@ export function createHonoAuthRoutes(config: AuthConfig) {
     if (!pendingCookie?.startsWith('pending:') || !code) return c.json({ error: 'invalid request' }, 400)
 
     const userId = pendingCookie.replace('pending:', '')
-    const result = await completeTotpLogin(resolved.db, resolved.secret, userId, code)
-    if (!result.ok) return c.json({ error: result.error }, 401)
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const result = await completeTotpLogin(resolved.db, resolved.secret, userId, code, ip)
+    if (!result.ok) return c.json({ error: result.error }, result.error === 'rate-limited' ? 429 : 401)
 
     deleteCookie(c, 'auth_pending_mfa', { path: '/' })
     setSessionCookie(c, result.data.token, result.data.session.expiresAt, resolved)
@@ -260,7 +292,11 @@ export function createHonoAuthRoutes(config: AuthConfig) {
   app.post('/password-reset/request', async (c) => {
     const { email } = await c.req.json<{ email?: string }>()
     if (!email) return c.json({ error: 'email required' }, 400)
-    await createPasswordResetToken(resolved.db, email)
+    const result = await createPasswordResetToken(resolved.db, email)
+    if (result.ok && result.data.token) {
+      const resetUrl = `${resolved.basePath}/password-reset/confirm?token=${result.data.token}`
+      sendEmail(buildPasswordResetEmail({ email, resetUrl }), resolved.email).catch(console.error)
+    }
     return c.json({ ok: true })
   })
 
@@ -271,6 +307,26 @@ export function createHonoAuthRoutes(config: AuthConfig) {
     const result = await confirmPasswordReset(resolved.db, token, password)
     if (!result.ok) return c.json({ error: result.error }, 400)
     deleteCookie(c, resolved.cookieName, { path: '/' })
+    return c.json({ ok: true })
+  })
+
+  // POST /refresh — rotate JWT access token using refresh token cookie
+  app.post('/refresh', async (c) => {
+    const refreshToken = getCookie(c, 'refresh_token')
+    if (!refreshToken) return c.json({ error: 'token-invalid' }, 401)
+    const result = await refreshAccessToken(resolved.db, refreshToken, resolved.secret)
+    if (!result.ok) return c.json({ error: result.error }, 401)
+    setCookie(c, 'access_token', result.data.accessToken, {
+      httpOnly: true, secure: resolved.secureCookies, sameSite: 'Lax',
+      expires: result.data.expiresAt, path: '/',
+    })
+    return c.json({ ok: true })
+  })
+
+  // POST /refresh/revoke — invalidate the refresh token (called on logout)
+  app.post('/refresh/revoke', async (c) => {
+    const refreshToken = getCookie(c, 'refresh_token')
+    if (refreshToken) await revokeRefreshToken(resolved.db, refreshToken)
     return c.json({ ok: true })
   })
 
