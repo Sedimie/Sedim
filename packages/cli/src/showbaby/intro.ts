@@ -11,6 +11,93 @@ export function showIntro(command: string): void {
   clack.log.message(TAGLINE)
 }
 
+// ============================================================
+// Claude CLI style banner — bold wordmark with colored border
+// ============================================================
+
+export function showBanner(command: string): void {
+  const c = chalk
+  const cyan = c.bold.cyan
+  const white = c.bold.white
+
+  // Top border
+  console.log(c.cyan('┌────────────────────────────────────────────────────────────┐'))
+  // Logo line — "sedim" in block letters with decorative brackets
+  console.log(
+    c.cyan('│') +
+      '  ' +
+      white('██████╗') +
+      '  ' +
+      white('██████╗') +
+      '  ' +
+      white('██╗') +
+      '  ' +
+      white('██╗') +
+      '                          ' +
+      c.cyan('│'),
+  )
+  console.log(
+    c.cyan('│') +
+      '  ' +
+      white('██╔══██╗') +
+      ' ' +
+      white('██╔══██╗') +
+      ' ' +
+      white('██║') +
+      '  ' +
+      white('██║') +
+      '                          ' +
+      c.cyan('│'),
+  )
+  console.log(
+    c.cyan('│') +
+      '  ' +
+      white('██║  ██║') +
+      ' ' +
+      white('██║  ██║') +
+      ' ' +
+      white('██║') +
+      '  ' +
+      white('██║') +
+      '                          ' +
+      c.cyan('│'),
+  )
+  console.log(
+    c.cyan('│') +
+      '  ' +
+      white('██████╔╝') +
+      ' ' +
+      white('██████╔╝') +
+      ' ' +
+      white('███████╗') +
+      ' ' +
+      white('██╗') +
+      '                     ' +
+      c.cyan('│'),
+  )
+  console.log(
+    c.cyan('│') +
+      '  ' +
+      white('╚═════╝') +
+      '  ' +
+      white('╚═════╝') +
+      '  ' +
+      white('╚══════╝') +
+      ' ' +
+      white('╚═') +
+      '                      ' +
+      c.cyan('│'),
+  )
+  // Bottom border
+  console.log(c.cyan('└────────────────────────────────────────────────────────────┘'))
+
+  console.log()
+  // Command pill
+  const tag = c.bgCyan.black(` ${command} `)
+  console.log(`  ${tag}  ${c.dim.cyan('install complete features, not dependencies')}`)
+  console.log()
+}
+
 export function showOutro(message: string): void {
   clack.outro(chalk.green(message))
 }

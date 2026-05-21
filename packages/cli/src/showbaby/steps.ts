@@ -64,8 +64,11 @@ export async function runTasks(tasks: clack.Task[]): Promise<void> {
 // ============================================================
 
 export function logSection(title: string): void {
-  const line = chalk.dim('─'.repeat(Math.max(0, 48 - title.length - 2)))
-  clack.log.message(chalk.dim(`── ${title} ${line}`))
+  console.log()
+  const color = chalk.cyan
+  const line = color('─'.repeat(Math.max(0, 52 - title.length - 4)))
+  console.log(`  ${color('┌─')} ${color.bold(title)} ${line}`)
+  console.log()
 }
 
 // ============================================================

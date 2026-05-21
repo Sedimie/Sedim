@@ -1,5 +1,6 @@
 import { buildConfig, isSedimInitialised, writeSedimConfig } from '../config/index'
 import { detect } from '../detector/index'
+import { bootstrapFrontendCompanion } from '../frontend/bootstrap'
 import type { DetectedContext, SedimConfig } from '../planning/types'
 import { MIN_NODE_VERSION } from '../shared/constants'
 import { ensureProjectRoot } from '../shared/ensure-project'
@@ -8,7 +9,7 @@ import { writeAuditEntry } from '../telemetry/audit-log'
 import { logger } from '../telemetry/logger'
 
 export async function runInit(options: { force?: boolean } = {}): Promise<void> {
-  ui.showIntro('init')
+  ui.showBanner('init')
 
   // ── find project root ────────────────────────────────────
   const projectRoot = await ensureProjectRoot()
@@ -43,6 +44,17 @@ export async function runInit(options: { force?: boolean } = {}): Promise<void> 
   }
 
   ui.showDetectionSummary(ctx)
+
+  // ── no frontend? offer to bootstrap one ──────────────────────
+  if (!ctx.frontend) {
+    const shouldBootstrap = await ui.showNoFrontendPrompt(ctx)
+    if (shouldBootstrap) {
+      const result = await bootstrapFrontendCompanion(projectRoot)
+      if (result) {
+        ctx.frontend = result.frontend
+      }
+    }
+  }
 
   // ── resolve ambiguities ──────────────────────────────────
   // only ask about fields the detector wasn't confident about

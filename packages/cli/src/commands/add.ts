@@ -1,6 +1,7 @@
 import { isSedimInitialised, readSedimConfig } from '../config/index'
 import { detect } from '../detector/index'
 import { verifyAndOverrideDetection } from '../detector/override'
+import { bootstrapFrontendCompanion } from '../frontend/bootstrap'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { readSession, writeSession } from '../session/index'
 import { ensureProjectRoot } from '../shared/ensure-project'
@@ -17,7 +18,7 @@ export async function runAdd(
   moduleName: string,
   options: { dryRun?: boolean; force?: boolean } = {},
 ): Promise<void> {
-  ui.showIntro(`add ${moduleName}`)
+  ui.showBanner(`add ${moduleName}`)
   const start = Date.now()
 
   const projectRoot = await ensureProjectRoot()
@@ -62,6 +63,19 @@ export async function runAdd(
   ui.showDetectionSummary(ctx)
   ctx = await verifyAndOverrideDetection(ctx)
 
+  // ── no frontend? offer to bootstrap one ──────────────────────
+  // This runs before feature selection so the frontend exists when
+  // the plan is built (plan-config stamps UI into the frontend).
+  if (!ctx.frontend) {
+    const shouldBootstrap = await ui.showNoFrontendPrompt(ctx)
+    if (shouldBootstrap) {
+      const result = await bootstrapFrontendCompanion(projectRoot)
+      if (result) {
+        ctx.frontend = result.frontend
+      }
+    }
+  }
+
   // ── load manifest ────────────────────────────────────────
   ui.logSection('Module')
   const manifestSpinner = ui.createSpinner(`Fetching ${moduleName} manifest...`)
@@ -100,14 +114,20 @@ export async function runAdd(
     )
   }
 
+  // UI style — available for all backends (Next.js directly, Express/Hono via React companion)
+  // The plan config handles where UI actually stamps based on framework detection
   if (manifest.features.ui?.length) {
     const uiLabels: Record<string, { label: string; hint: string }> = {
-      headless: { label: 'Headless', hint: 'unstyled, full control' },
+      headless: { label: 'Headless', hint: 'unstyled, full control — works with any frontend' },
       tailwind: { label: 'Tailwind', hint: 'pre-styled with Tailwind CSS' },
       themed: { label: 'Themed', hint: 'pre-built theme variants' },
     }
+    const uiHint =
+      ctx.framework.value !== 'nextjs'
+        ? ' (requires Next.js OR a React app alongside Express/Hono)'
+        : ''
     selections.ui = await ui.select(
-      'UI style for auth components?',
+      `UI style for auth components${uiHint}?`,
       manifest.features.ui.map(u => ({
         value: u,
         label: uiLabels[u]?.label ?? u,
@@ -125,10 +145,36 @@ export async function runAdd(
   }
 
   if (manifest.features.authorization?.length) {
-    selections.authorization = await ui.select(
-      'Authorization model?',
-      manifest.features.authorization.map(a => ({ value: a, label: a })),
-    )
+    selections.authorization = await ui.select('Authorization model?', [
+      { value: 'none', label: 'None', hint: 'skip authorization — add it later' },
+      ...manifest.features.authorization.map(a => ({
+        value: a,
+        label: a.toUpperCase(),
+        hint: a === 'rbac' ? 'role-based access control' : 'attribute-based access control',
+      })),
+    ])
+  }
+
+  if (manifest.features.session?.length) {
+    const sessionLabels: Record<string, { label: string; hint: string }> = {
+      'session-cookie': {
+        label: 'Session cookies (recommended)',
+        hint: 'DB-backed sessions, full revocation',
+      },
+      jwt: { label: 'JWT (stateless API)', hint: 'short-lived access tokens, refresh rotation' },
+    }
+    selections.session = await ui.select('Session transport?', [
+      {
+        value: 'session-cookie',
+        label: 'Session cookies (recommended)',
+        hint: 'DB-backed sessions, full revocation',
+      },
+      {
+        value: 'jwt',
+        label: 'JWT (stateless API)',
+        hint: 'short-lived access tokens, refresh rotation',
+      },
+    ])
   }
 
   // ── build plan ───────────────────────────────────────────
@@ -136,16 +182,34 @@ export async function runAdd(
   const planSpinner = ui.createSpinner('Building install plan...')
 
   // selectedFeatures is the flat list of what the user picked
+  // 'none' for authorization means skip it — don't add to selectedFeatures
   const selectedFeatures = [
     ...((selections.providers as string[]) ?? []),
     ...((selections.ui as string[]) ? [selections.ui as string] : []),
     ...((selections.themeVariant as string[]) ? [selections.themeVariant as string] : []),
-    ...((selections.authorization as string[]) ? [selections.authorization as string] : []),
+    ...((selections.authorization as string[]) && selections.authorization !== 'none'
+      ? [selections.authorization as string]
+      : []),
+    ...((selections.session as string[]) ? [selections.session as string] : []),
   ]
 
   // load plan config — uses module's own plan-config.ts if available,
   // falls back to generic manifest conversion
   const planConfig = await loadPlanConfig(moduleName, manifest, ctx, selectedFeatures)
+
+  // Fail fast for unsupported stacks — don't build a plan we can't use
+  const unsupported = (planConfig as unknown as Record<string, unknown>)['_unsupportedReasons'] as
+    | string[]
+    | undefined
+  if (unsupported?.length) {
+    planSpinner.stop('Unsupported stack')
+    for (const reason of unsupported) {
+      ui.logError(reason)
+    }
+    ui.showCancel(
+      'Cannot proceed — use a supported stack (Next.js, Express, or Hono with Drizzle or Prisma).',
+    )
+  }
 
   let plan: InstallPlan
   try {
@@ -155,17 +219,6 @@ export async function runAdd(
     planSpinner.stop('Planning failed')
     ui.showError(err)
     process.exit(1)
-  }
-
-  // surface unsupported stack warnings before showing the plan
-  const unsupported = (planConfig as unknown as Record<string, unknown>)['_unsupportedReasons'] as
-    | string[]
-    | undefined
-  if (unsupported?.length) {
-    for (const reason of unsupported) {
-      ui.logWarn(reason)
-    }
-    ui.showCancel('Cannot proceed — resolve the issues above first.')
   }
 
   ui.showPlanSummary(plan)
@@ -206,8 +259,22 @@ export async function runAdd(
   // ── confirm before write ─────────────────────────────────
   const proceed = await ui.confirm('Apply this plan?', true)
   if (!proceed) {
-    ui.showCancel('Cancelled — no files written.')
-    process.exit(0)
+    // Show the OAuth setup guide when user declines so they know how to get credentials
+    const oauthProviders = ((selections.providers as string[]) ?? []).filter(p =>
+      p.startsWith('oauth-'),
+    )
+    const oauthEnvVars = plan.envVarsToAdd.filter(
+      e =>
+        e.key.startsWith('GOOGLE_') || e.key.startsWith('GITHUB_') || e.key.startsWith('DISCORD_'),
+    )
+    if (oauthProviders.length > 0 || oauthEnvVars.length > 0) {
+      const { showOAuthSetupGuide, showQuickEnvSummary } = await import(
+        '../showbaby/oauth-guide.js'
+      )
+      showOAuthSetupGuide(oauthProviders)
+      showQuickEnvSummary(plan.envVarsToAdd)
+    }
+    ui.showCancel('No files written — run `sedim add auth` again when ready.')
   }
 
   // ── collect env var values interactively ─────────────────

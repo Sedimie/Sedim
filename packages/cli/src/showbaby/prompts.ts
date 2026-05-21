@@ -26,7 +26,10 @@ export async function select<T extends string>(
   message: string,
   options: Array<{ value: T; label: string; hint?: string }>,
 ): Promise<T> {
-  const result = await clack.select({ message, options })
+  const result = await clack.select({
+    message,
+    options: options as Parameters<typeof clack.select>[0]['options'],
+  })
   handleCancel(result)
   return result as T
 }
@@ -36,7 +39,11 @@ export async function multiselect<T extends string>(
   options: Array<{ value: T; label: string; hint?: string }>,
   required = true,
 ): Promise<T[]> {
-  const result = await clack.multiselect({ message, options, required })
+  const result = await clack.multiselect({
+    message,
+    options: options as Parameters<typeof clack.multiselect>[0]['options'],
+    required,
+  })
   handleCancel(result)
   return result as T[]
 }
