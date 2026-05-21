@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { isSedimInitialised } from '../config/index'
 import { detect } from '../detector/index'
+import { bootstrapFrontendCompanion } from '../frontend/bootstrap'
 import { readSession } from '../session/index'
 import { MIN_NODE_VERSION } from '../shared/constants'
 import { ensureProjectRoot } from '../shared/ensure-project'
@@ -47,8 +48,10 @@ export async function runDoctor(): Promise<void> {
   ui.logSection('Running detector...')
   const spinner = ui.spinDetecting()
 
+  let ctx: Awaited<ReturnType<typeof detect>> | null = null
+
   try {
-    const ctx = await detect(projectRoot)
+    ctx = await detect(projectRoot)
     spinner.stop('Detection complete')
 
     checks.push({
@@ -81,6 +84,17 @@ export async function runDoctor(): Promise<void> {
       message: envExists ? 'found' : 'no .env or .env.local found',
       fix: envExists ? undefined : 'Create a .env file at your project root',
     })
+
+    // ── no frontend? offer to bootstrap one ─────────────────
+    if (!ctx.frontend && ctx.framework.value !== 'nextjs') {
+      const shouldBootstrap = await ui.showNoFrontendPrompt(ctx)
+      if (shouldBootstrap) {
+        const result = await bootstrapFrontendCompanion(projectRoot)
+        if (result) {
+          ui.logSuccess(`Frontend ready at ${result.dir}/`)
+        }
+      }
+    }
   } catch (err) {
     spinner.stop('Detection failed')
     checks.push({
