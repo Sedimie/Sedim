@@ -67,7 +67,7 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/sedim-dev/sedim' },
+      { icon: 'github', link: 'https://github.com/sedimie/sedim' },
     ],
     footer: {
       message: 'Released under the MIT License.',

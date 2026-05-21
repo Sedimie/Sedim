@@ -50,7 +50,7 @@ The Sedim CLI and registry infrastructure are operational. The first module (aut
 
 Available modules: **auth** (v0.2.0)
 
-Proposed modules are tracked as GitHub discussions — see [the roadmap discussion](https://github.com/sedim-dev/sedim/discussions).
+Proposed modules are tracked as GitHub discussions — see [the roadmap discussion](https://github.com/sedimie/sedim/discussions).
 
 ---
 

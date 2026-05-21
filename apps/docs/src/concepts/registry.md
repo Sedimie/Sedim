@@ -22,12 +22,12 @@ The CLI loads from local first, then falls back to remote.
 For production, manifests are also published to GitHub:
 
 ```
-https://raw.githubusercontent.com/sedim-dev/sedim/refs/heads/main/registry/<module>/latest.json
+https://raw.githubusercontent.com/sedimie/sedim/refs/heads/main/registry/<module>/latest.json
 ```
 
 A versioned path is also supported:
 ```
-https://raw.githubusercontent.com/sedim-dev/sedim/refs/tags/v0.2.0/registry/auth/latest.json
+https://raw.githubusercontent.com/sedimie/sedim/refs/tags/v0.2.0/registry/auth/latest.json
 ```
 
 ## Manifest Structure

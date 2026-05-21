@@ -90,17 +90,17 @@ npm run dev
 
 ## Documentation
 
-**[Getting Started →](https://github.com/sedim-dev/sedim/tree/main/apps/docs/src/guide/)** — Install, init, add your first module
+**[Getting Started →](https://github.com/sedimie/sedim/tree/main/apps/docs/src/guide/)** — Install, init, add your first module
 
-**[Auth Module →](https://github.com/sedim-dev/sedim/tree/main/apps/docs/src/auth/)** — Full feature reference for the auth module
+**[Auth Module →](https://github.com/sedimie/sedim/tree/main/apps/docs/src/auth/)** — Full feature reference for the auth module
 
-**[CLI Reference →](https://github.com/sedim-dev/sedim/tree/main/apps/docs/src/cli/)** — All sedim commands, options, and flags
+**[CLI Reference →](https://github.com/sedimie/sedim/tree/main/apps/docs/src/cli/)** — All sedim commands, options, and flags
 
-**[Concepts →](https://github.com/sedim-dev/sedim/tree/main/apps/docs/src/concepts/)** — How stamping works, the module system
+**[Concepts →](https://github.com/sedimie/sedim/tree/main/apps/docs/src/concepts/)** — How stamping works, the module system
 
-**[Guides →](https://github.com/sedim-dev/sedim/tree/main/apps/docs/src/guides/)** — OAuth setup, TOTP enrollment, production deployment
+**[Guides →](https://github.com/sedimie/sedim/tree/main/apps/docs/src/guides/)** — OAuth setup, TOTP enrollment, production deployment
 
-**[Roadmap →](https://github.com/sedim-dev/sedim/tree/main/apps/docs/src/roadmap/)** — What's coming next
+**[Roadmap →](https://github.com/sedimie/sedim/tree/main/apps/docs/src/roadmap/)** — What's coming next
 
 ---
 
@@ -121,9 +121,9 @@ The stamping plan is driven by a **module manifest** (`registry/<module>/latest.
 
 ## Registry
 
-Module manifests live in the [`registry/`](https://github.com/sedim-dev/sedim/tree/main/registry) directory of this repo — the same repo you're reading now. The local registry is used by default during development; the CLI falls back to the GitHub raw URL for published releases.
+Module manifests live in the [`registry/`](https://github.com/sedimie/sedim/tree/main/registry) directory of this repo — the same repo you're reading now. The local registry is used by default during development; the CLI falls back to the GitHub raw URL for published releases.
 
-Browse available modules at the [Sedim Registry](https://github.com/sedim-dev/registry).
+Browse available modules at the [Sedim Registry](https://github.com/sedimie/registry).
 
 ---
 
