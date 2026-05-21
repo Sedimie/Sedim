@@ -8,23 +8,26 @@ For development and offline use, manifests live in the repo:
 
 ```
 registry/
-└── auth/
-    └── latest.json
+├── auth/
+│   └── latest.json
+└── modules/
+    └── <module>/
+        └── latest.json
 ```
 
 The CLI loads from local first, then falls back to remote.
 
 ## Remote Registry
 
-Production manifests are hosted on GitHub:
+For production, manifests are also published to GitHub:
 
 ```
-https://raw.githubusercontent.com/sedim-dev/registry/main/modules/<module>/latest.json
+https://raw.githubusercontent.com/sedim-dev/sedim/refs/heads/main/registry/<module>/latest.json
 ```
 
 A versioned path is also supported:
 ```
-https://raw.githubusercontent.com/sedim-dev/registry/refs/tags/v0.2.0/modules/auth/latest.json
+https://raw.githubusercontent.com/sedim-dev/sedim/refs/tags/v0.2.0/registry/auth/latest.json
 ```
 
 ## Manifest Structure
@@ -56,9 +59,7 @@ Each manifest contains:
 ## Version Resolution
 
 When you run `sedim add auth`, the CLI:
-1. Loads `registry/auth/latest.json` from local
+1. Loads `registry/auth/latest.json` from local (monorepo) or remote (published package)
 2. Merges with your `sedim.config.ts` selections
 3. Builds the install plan
 4. Executes file operations
-
-If `latest.json` is missing locally, it fetches from the remote registry.
