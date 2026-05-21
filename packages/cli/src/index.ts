@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Command } from 'commander'
 import { runAdd } from './commands/add'
 import { runContinue } from './commands/continue'
@@ -8,6 +10,8 @@ import { runInit } from './commands/init'
 import { runPlan } from './commands/plan'
 import { CLI_VERSION } from './shared/constants'
 import * as ui from './showbaby/index'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const program = new Command()
 
@@ -19,7 +23,11 @@ program
   .hook('preAction', thisCommand => {
     const opts = thisCommand.opts()
     if (opts.cwd) {
-      process.chdir(opts.cwd)
+      // Resolve relative to monorepo root (three levels up from packages/cli/src/)
+      const cwd = path.isAbsolute(opts.cwd)
+        ? opts.cwd
+        : path.resolve(__dirname, '..', '..', '..', opts.cwd)
+      process.chdir(cwd)
     }
   })
 

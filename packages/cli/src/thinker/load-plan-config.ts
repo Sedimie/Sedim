@@ -14,31 +14,20 @@ export async function loadPlanConfig(
   ctx: DetectedContext,
   selectedFeatures: string[],
 ): Promise<PlanConfig> {
-  // try to dynamically import the module's own plan-config
-  // this works in the monorepo because packages are workspace dependencies
+  // try workspace package import first — this is how tsx resolves TypeScript correctly
+  // the @sedim/auth symlink in node_modules links to packages/auth/src/
   try {
-    const moduleId = `@sedim/${moduleName}`
-    const mod = await import(moduleId).catch(() => null)
-
-    // look for createXxxPlanConfig — e.g. createAuthPlanConfig
     const fnName = `create${capitalize(moduleName)}PlanConfig`
+    const mod = await import(`@sedim/${moduleName}/plan-config`)
     if (mod && typeof mod[fnName] === 'function') {
       return (mod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(
         ctx,
         selectedFeatures,
       )
     }
-
-    // also try the /plan-config subpath export
-    const subMod = await import(`${moduleId}/plan-config`).catch(() => null)
-    if (subMod && typeof subMod[fnName] === 'function') {
-      return (subMod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(
-        ctx,
-        selectedFeatures,
-      )
-    }
-  } catch {
-    // module not installed or no plan-config — fall through to generic
+  } catch (err) {
+    // module not installed, no plan-config, or import failed — fall through to generic
+    // swallow all errors silently — generic fallback is always available
   }
 
   // generic fallback — works for any module with a valid manifest

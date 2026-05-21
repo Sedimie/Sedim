@@ -1,4 +1,5 @@
 import path from 'node:path'
+import chalk from 'chalk'
 import fs from 'fs-extra'
 import * as ui from '../showbaby/index'
 import { WorkspaceRootError } from './errors'
@@ -6,7 +7,20 @@ import { findProjectRoot } from './fs'
 
 export async function ensureProjectRoot(from?: string): Promise<string> {
   try {
-    return await findProjectRoot(from)
+    const root = await findProjectRoot(from)
+
+    // warn if the project appears empty or incomplete
+    if (isEmptyProject(root)) {
+      console.log()
+      ui.logWarn('This directory appears mostly empty.')
+      console.log(
+        `  ${chalk.dim('Add a package.json and/or tsconfig.json, or create a src/ folder.')}`,
+      )
+      console.log(`  ${chalk.dim('Without these, sedim cannot detect your stack reliably.')}`)
+      console.log()
+    }
+
+    return root
   } catch (err) {
     if (err instanceof WorkspaceRootError) {
       ui.logSection('Workspace Detected')
@@ -38,8 +52,7 @@ async function getWorkspaceApps(
 ): Promise<Array<{ name: string; absPath: string; relPath: string }>> {
   const apps: Array<{ name: string; absPath: string; relPath: string }> = []
 
-  // A simple heuristic for now: look inside apps/ and packages/
-  // In a robust implementation, we would parse pnpm-workspace.yaml / package.json workspaces.
+  // Scan apps/ and packages/ directories for valid workspace members
   const scanDirs = ['apps', 'packages']
   for (const dir of scanDirs) {
     const absDir = path.join(root, dir)
@@ -61,6 +74,27 @@ async function getWorkspaceApps(
     }
   }
 
-  // Check root itself if it's considered an app but has workspace defined
   return apps
+}
+
+// Check if the project root appears to be an empty/incomplete project
+export function isEmptyProject(projectRoot: string): boolean {
+  const markers = [
+    'package.json',
+    'tsconfig.json',
+    'src/index.ts',
+    'src/index.js',
+    'index.ts',
+    'index.js',
+    'app',
+    'src',
+  ]
+
+  let markerCount = 0
+  for (const marker of markers) {
+    if (fs.existsSync(path.join(projectRoot, marker))) markerCount++
+  }
+
+  // Empty if fewer than 2 markers exist
+  return markerCount < 2
 }
