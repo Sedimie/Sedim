@@ -1,6 +1,6 @@
 export type { DoctorCheck } from './errors'
 export { showDoctorReport, showError } from './errors'
-export { showCancel, showIntro, showOutro } from './intro'
+export { showBanner, showCancel, showIntro, showOutro } from './intro'
 export { collectEnvValues, confirm, handleCancel, multiselect, select, text } from './prompts'
 export {
   createSpinner,
@@ -18,6 +18,8 @@ export {
   showConflict,
   showDetectionSummary,
   showDiff,
+  showDiffs,
   showEndReport,
+  showNoFrontendPrompt,
   showPlanSummary,
 } from './summary'
