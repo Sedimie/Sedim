@@ -7,7 +7,7 @@ export const users = mysqlTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   passwordHash: text('password_hash'),
-  failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+  failedLoginAttempts: int('failed_login_attempts').notNull().default(0),
   lockedAt: datetime('locked_at'),
   createdAt: datetime('created_at').notNull(),
 })

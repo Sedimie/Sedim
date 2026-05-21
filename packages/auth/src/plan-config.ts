@@ -209,8 +209,76 @@ export function createAuthPlanConfig(
     : selectedFeatures.includes('themed') ? 'themed'
     : 'headless'
 
-  // auth-client and useAuth hook — always stamped when any UI is needed
-  // (Next.js only for now — Express/Hono don't have a React frontend by default)
+  // ── Stamp into detected React frontend companion ────────────
+  // When Express/Hono is used alongside a React app (monorepo or sibling dirs),
+  // we stamp UI components into the frontend so it can talk to the backend API.
+  if (ctx.frontend && framework !== 'nextjs') {
+    const fe = ctx.frontend
+    const feAuthDir = `${fe.absPath}/src/sedim/auth`
+
+    // auth-client — API calls to the backend (uses APP_URL env var)
+    templates.push({
+      templateKey: 'auth/ui/auth-client',
+      outputPath: () => `${feAuthDir}/auth-client.ts`,
+      overwriteStrategy: 'skip',
+    })
+
+    // useAuth hook
+    templates.push({
+      templateKey: 'auth/ui/use-auth',
+      outputPath: () => `${feAuthDir}/use-auth.ts`,
+      overwriteStrategy: 'skip',
+    })
+
+    // email+password forms
+    if (selectedFeatures.includes('email-password')) {
+      templates.push(
+        { templateKey: `auth/ui/${uiStyle}/LoginForm`, outputPath: () => `${feAuthDir}/LoginForm.tsx`, overwriteStrategy: 'skip' },
+        { templateKey: `auth/ui/${uiStyle}/SignupForm`, outputPath: () => `${feAuthDir}/SignupForm.tsx`, overwriteStrategy: 'skip' },
+        { templateKey: `auth/ui/${uiStyle}/ForgotPasswordForm`, outputPath: () => `${feAuthDir}/ForgotPasswordForm.tsx`, overwriteStrategy: 'skip' },
+        { templateKey: `auth/ui/${uiStyle}/ResetPasswordForm`, outputPath: () => `${feAuthDir}/ResetPasswordForm.tsx`, overwriteStrategy: 'skip' },
+      )
+    }
+
+    // magic link form
+    if (selectedFeatures.includes('magic-link')) {
+      templates.push({
+        templateKey: `auth/ui/${uiStyle}/MagicLinkForm`,
+        outputPath: () => `${feAuthDir}/MagicLinkForm.tsx`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // oauth buttons
+    if (selectedFeatures.some(f => f.startsWith('oauth-'))) {
+      templates.push({
+        templateKey: `auth/ui/${uiStyle}/OAuthButton`,
+        outputPath: () => `${feAuthDir}/OAuthButton.tsx`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // totp form
+    if (selectedFeatures.includes('totp')) {
+      templates.push({
+        templateKey: `auth/ui/${uiStyle}/TotpVerifyForm`,
+        outputPath: () => `${feAuthDir}/TotpVerifyForm.tsx`,
+        overwriteStrategy: 'skip',
+      })
+    }
+
+    // themed CSS tokens
+    if (uiStyle === 'themed') {
+      const themeVariant = selectedFeatures.find(f => ['modern', 'minimal', 'colorful'].includes(f)) || 'modern'
+      templates.push({
+        templateKey: `auth/ui/themed/${themeVariant}-tokens.css`,
+        outputPath: () => `${feAuthDir}/tokens.css`,
+        overwriteStrategy: 'skip',
+      })
+    }
+  }
+
+  // ── Stamp into Next.js (native support) ────────────────────
   if (framework === 'nextjs') {
     templates.push({
       templateKey: 'auth/ui/auth-client',
