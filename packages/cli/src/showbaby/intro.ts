@@ -1,5 +1,6 @@
 import * as clack from '@clack/prompts'
 import chalk from 'chalk'
+import figlet from 'figlet'
 import { CLI_VERSION } from '../shared/constants'
 
 // the sedim wordmark — shown once at the start of every command
@@ -20,76 +21,26 @@ export function showBanner(command: string): void {
   const cyan = c.bold.cyan
   const white = c.bold.white
 
-  // Top border
-  console.log(c.cyan('┌────────────────────────────────────────────────────────────┐'))
-  // Logo line — "sedim" in block letters with decorative brackets
-  console.log(
-    c.cyan('│') +
-      '  ' +
-      white('██████╗') +
-      '  ' +
-      white('██████╗') +
-      '  ' +
-      white('██╗') +
-      '  ' +
-      white('██╗') +
-      '                          ' +
-      c.cyan('│'),
-  )
-  console.log(
-    c.cyan('│') +
-      '  ' +
-      white('██╔══██╗') +
-      ' ' +
-      white('██╔══██╗') +
-      ' ' +
-      white('██║') +
-      '  ' +
-      white('██║') +
-      '                          ' +
-      c.cyan('│'),
-  )
-  console.log(
-    c.cyan('│') +
-      '  ' +
-      white('██║  ██║') +
-      ' ' +
-      white('██║  ██║') +
-      ' ' +
-      white('██║') +
-      '  ' +
-      white('██║') +
-      '                          ' +
-      c.cyan('│'),
-  )
-  console.log(
-    c.cyan('│') +
-      '  ' +
-      white('██████╔╝') +
-      ' ' +
-      white('██████╔╝') +
-      ' ' +
-      white('███████╗') +
-      ' ' +
-      white('██╗') +
-      '                     ' +
-      c.cyan('│'),
-  )
-  console.log(
-    c.cyan('│') +
-      '  ' +
-      white('╚═════╝') +
-      '  ' +
-      white('╚═════╝') +
-      '  ' +
-      white('╚══════╝') +
-      ' ' +
-      white('╚═') +
-      '                      ' +
-      c.cyan('│'),
-  )
-  // Bottom border
-  console.log(c.cyan('└────────────────────────────────────────────────────────────┘'))
+  // Render SEDIM in big ASCII art
+  const art = figlet.textSync('SEDIM', {
+    font: 'Block',
+    horizontalLayout: 'full',
+  })
+
+  // Split into lines and wrap with cyan border + pipe
+  const artLines = art.split('\n')
+  const border = cyan('│')
+
+  // Top and bottom borders
+  console.log(cyan('┌────────────────────────────────────────────────────────────┐'))
+
+  for (const line of artLines) {
+    // Pad to fit inside the 60-char box, align to left
+    const padded = line.padEnd(58).slice(0, 58)
+    console.log(`${border} ${white(padded)} ${border}`)
+  }
+
+  console.log(cyan('└────────────────────────────────────────────────────────────┘'))
 
   console.log()
   // Command pill

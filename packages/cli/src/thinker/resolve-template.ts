@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { existsSync } from 'fs'
 import type { DetectedContext } from '../planning/types'
 import { exists, readText } from '../shared/fs'
 
@@ -16,6 +17,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // template — the source file IS the template. Only files that need
 // path substitution or config placeholders have explicit template files.
 
+// projectRoot is passed via ctx.structure. It is validated against sedim.config.ts
+// so it's a reliable anchor. We go 2 levels up from projectRoot to reach monorepo root,
+// then into packages/<module>/src.
+function getPackageRoot(projectRoot: string, moduleName: string): string {
+  // projectRoot → monorepo root (3 levels up from project root)
+  // then packages/<module>/src
+  return path.resolve(projectRoot, '..', '..', '..', 'packages', moduleName, 'src')
+}
+
 export async function resolveTemplate(
   templateKey: string,
   ctx: DetectedContext,
@@ -27,7 +37,25 @@ export async function resolveTemplate(
   }
 
   const relPath = rest.join('/')
-  const packageRoot = path.resolve(__dirname, '../../../../packages', moduleName, 'src')
+
+  // Use projectRoot as anchor — it's validated and doesn't depend on __dirname
+  const projectRoot = ctx.projectRoot ?? process.cwd()
+  const packageRoot = getPackageRoot(projectRoot, moduleName)
+
+  // Fallback to __dirname-based resolution for older callers that don't have projectRoot
+  // This handles cases where ctx isn't fully populated
+  const tryPackageRoot = (levels: string) =>
+    path.resolve(__dirname, levels, 'packages', moduleName, 'src')
+  const packageRoot3 = tryPackageRoot('../../..')
+  const packageRoot4 = tryPackageRoot('../../../../..')
+  // Use projectRoot-based path if it exists, otherwise try __dirname paths
+  const resolvedRoot = existsSync(packageRoot)
+    ? packageRoot
+    : existsSync(packageRoot3)
+      ? packageRoot3
+      : existsSync(packageRoot4)
+        ? packageRoot4
+        : packageRoot
 
   // ── Special case: generated page content ─────────────────
   // These keys produce fully generated content — no source file needed.
@@ -45,12 +73,12 @@ export async function resolveTemplate(
   let content: string
 
   // 1. explicit substitution template
-  const templatePath = path.join(packageRoot, 'templates', `${relPath}.ts`)
+  const templatePath = path.join(resolvedRoot, 'templates', `${relPath}.ts`)
   if (await exists(templatePath)) {
     const raw = await readText(templatePath)
     content = applySubstitutions(raw, ctx, selectedFeatures)
   } else {
-    const templatePrismaPath = path.join(packageRoot, 'templates', `${relPath}.prisma`)
+    const templatePrismaPath = path.join(resolvedRoot, 'templates', `${relPath}.prisma`)
     if (await exists(templatePrismaPath)) {
       const raw = await readText(templatePrismaPath)
       content = applySubstitutions(raw, ctx, selectedFeatures)
@@ -60,7 +88,7 @@ export async function resolveTemplate(
       const hasExt = knownExts.some(e => relPath.endsWith(e))
 
       if (hasExt) {
-        const sourcePath = path.join(packageRoot, relPath)
+        const sourcePath = path.join(resolvedRoot, relPath)
         if (await exists(sourcePath)) {
           content = await readText(sourcePath)
           // Apply substitutions to all source files — they may contain
@@ -73,23 +101,22 @@ export async function resolveTemplate(
         let found = false
         content = ''
         for (const ext of ['.ts', '.tsx', '.css']) {
-          const sourcePath = path.join(packageRoot, `${relPath}${ext}`)
+          const sourcePath = path.join(resolvedRoot, `${relPath}${ext}`)
           if (await exists(sourcePath)) {
             const raw = await readText(sourcePath)
-            const isTemplateFile = sourcePath.includes(`${path.sep}templates${path.sep}`)
-            content = isTemplateFile ? applySubstitutions(raw, ctx, selectedFeatures) : raw
+            content = applySubstitutions(raw, ctx, selectedFeatures)
             found = true
             break
           }
         }
         if (!found) {
-          const sourcePrismaPath = path.join(packageRoot, `${relPath}.prisma`)
+          const sourcePrismaPath = path.join(resolvedRoot, `${relPath}.prisma`)
           if (await exists(sourcePrismaPath)) {
             content = await readText(sourcePrismaPath)
           } else {
             throw new Error(
               `Template not found for key "${templateKey}". ` +
-                `Checked:\n  ${templatePath}\n  ${path.join(packageRoot, relPath)}.[ts|tsx|css]`,
+                `Checked:\n  ${templatePath}\n  ${path.join(resolvedRoot, relPath)}.[ts|tsx|css]`,
             )
           }
         }

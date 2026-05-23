@@ -12,7 +12,18 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["cli", "codegen", "auth", "typescript", "nodejs", "drizzle", "prisma", "express", "nextjs", "hono"],
+  "keywords": [
+    "cli",
+    "codegen",
+    "auth",
+    "typescript",
+    "nodejs",
+    "drizzle",
+    "prisma",
+    "express",
+    "nextjs",
+    "hono"
+  ],
   "author": "Sedim <hello@sedim.dev>",
   "license": "MIT",
   "dependencies": {
@@ -28,6 +39,7 @@
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.6.2",
+    "figlet": "^1.11.0",
     "ts-morph": "^28.0.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
