@@ -101,6 +101,27 @@
   border-color: #d1d5db !important;
 }
 
+/* Password show/hide toggle */
+.password-toggle {
+  position: absolute !important;
+  right: 0.5rem !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--auth-muted) !important;
+  cursor: pointer !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 0.25rem 0.5rem !important;
+  width: auto !important;
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+.password-toggle:hover {
+  color: var(--auth-fg) !important;
+  background: transparent !important;
+}
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   :root {

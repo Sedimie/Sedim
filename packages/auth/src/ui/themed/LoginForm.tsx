@@ -80,8 +80,8 @@ export function LoginForm({ onSuccess, onTotpRequired, onError, redirectTo }: Lo
         </div>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <input id="login-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-            required autoComplete="current-password" disabled={loading} style={{ ...s.input, paddingRight: '3rem' }} />
-          <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '0.5rem', background: 'transparent', border: 'none', color: 'var(--auth-muted)', cursor: 'pointer', fontSize: '12px' }}>
+            required autoComplete="current-password" disabled={loading} style={{ ...s.input, paddingRight: '2.5rem' }} />
+          <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
             {showPassword ? 'Hide' : 'Show'}
           </button>
         </div>

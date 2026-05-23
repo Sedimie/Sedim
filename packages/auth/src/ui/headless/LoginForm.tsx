@@ -74,7 +74,7 @@ export function LoginForm({ onSuccess, onTotpRequired, onError, redirectTo }: Lo
             required
             autoComplete="current-password"
             disabled={loading}
-            style={{ borderRadius: 6, border: '1px solid #d1d5db', padding: '0.5rem 0.75rem', fontSize: '0.875rem', width: '100%', boxSizing: 'border-box', outline: 'none', paddingRight: '3rem' }}
+            style={{ borderRadius: 6, border: '1px solid #d1d5db', padding: '0.5rem 0.75rem', fontSize: '0.875rem', width: '100%', boxSizing: 'border-box', outline: 'none', paddingRight: '2.5rem' }}
           />
           <button
             type="button"
