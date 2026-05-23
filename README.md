@@ -123,7 +123,7 @@ The stamping plan is driven by a **module manifest** (`registry/<module>/latest.
 
 Module manifests live in the [`registry/`](https://github.com/sedimie/sedim/tree/main/registry) directory of this repo — the same repo you're reading now. The local registry is used by default during development; the CLI falls back to the GitHub raw URL for published releases.
 
-Browse available modules at the [Sedim Registry](https://github.com/sedimie/registry).
+Browse available modules at the [Sedim Registry](https://github.com/sedimie/sedim/tree/main/registry).
 
 ---
 
