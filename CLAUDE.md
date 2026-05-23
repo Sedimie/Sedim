@@ -117,8 +117,7 @@ Sedim/
 4. `thinker/index.ts` → builds `InstallPlan` from manifest + detected context
 5. `writer/apply-plan.ts` → executes file operations
 
-**Local registry:** `registry/<module>/latest.json` — used for dev and offline.
-**Remote registry:** `https://raw.githubusercontent.com/sedim-dev/registry/main/modules/<module>/latest.json`
+**Local registry:** `registry/<module>/latest.json` — the registry lives at `github.com/Sedimie/Sedim/tree/main/registry`
 
 ---
 
@@ -204,4 +203,4 @@ These are known and acceptable for v1:
 
 ---
 
-*Last updated: 2026-05-20*
+*Last updated: 2026-05-24*
