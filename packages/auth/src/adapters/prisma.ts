@@ -1,5 +1,5 @@
 import type { Session } from '../core/session.js'
-import type { DatabaseAdapter, User, OtpToken, OAuthAccount, TotpCredential, BackupCode } from './types.js'
+import type { DatabaseAdapter, User, OtpToken, OAuthAccount, TotpCredential, BackupCode, RefreshToken } from './types.js'
 
 // ── Prisma client interface ───────────────────────────────────
 // We type only the models we use so this adapter doesn't need to
@@ -24,6 +24,7 @@ interface PrismaModel<TCreate, TWhere, TUpdate> {
   create(args: { data: TCreate }): Promise<unknown>
   findUnique(args: { where: TWhere }): Promise<unknown>
   findFirst(args: { where: TWhere }): Promise<unknown>
+  findMany(args: { where: TWhere }): Promise<unknown>
   update(args: { where: TWhere; data: TUpdate }): Promise<unknown>
   delete(args: { where: TWhere }): Promise<void>
   deleteMany(args: { where: Partial<TWhere> }): Promise<void>
@@ -53,8 +54,8 @@ interface BackupCodeCreateInput { id: string; userId: string; codeHash: string; 
 interface BackupCodeWhereInput { id?: string; userId?: string; codeHash?: string }
 interface BackupCodeUpdateInput { usedAt?: Date }
 
-interface RefreshTokenCreateInput { id: string; userId: string; sessionId: string; expiresAt: Date; createdAt: Date }
-interface RefreshTokenWhereInput { id?: string }
+interface RefreshTokenCreateInput { id: string; userId: string; sessionId: string; expiresAt: Date; createdAt?: Date }
+interface RefreshTokenWhereInput { id?: string; expiresAt?: { lt: Date } }
 
 // ── Factory ───────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ export function createPrismaAdapter(prisma: PrismaClient): DatabaseAdapter {
     // ── refresh tokens ───────────────────────────────────────
 
     async createRefreshToken(data) {
-      await prisma.refreshToken.create({ data })
+      await prisma.refreshToken.create({ data: { ...data, createdAt: new Date() } })
     },
 
     async findRefreshToken(id) {

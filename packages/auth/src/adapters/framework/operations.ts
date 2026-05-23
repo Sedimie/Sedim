@@ -1,13 +1,13 @@
-import { hashPassword, verifyPassword, needsRehash } from '../core/hash-password.js'
-import { generateSessionToken, hashSessionToken, generateOtpToken, hashBackupCode } from '../core/generate-token.js'
-import { buildSession, validateSession } from '../core/session.js'
-import { generatePkcePair, buildAuthorizationUrl } from '../core/pkce.js'
-import { verifyTotpCode, buildTotpUri } from '../core/totp.js'
-import { createAccessToken, hashRefreshToken, ACCESS_TOKEN_TTL_MS } from '../core/jwt.js'
-import { requireRole, hasPermission, hasMinimumRole, type Action, type Resource } from '../core/rbac.js'
-import { evaluateAbac, type AbacPolicy, type AbacContext, type SubjectAttributes, type ResourceAttributes } from '../core/abac.js'
-import type { DatabaseAdapter, User } from './types.js'
-import type { Session } from '../core/session.js'
+import { hashPassword, verifyPassword, needsRehash } from '../../core/hash-password.js'
+import { generateSessionToken, hashSessionToken, generateOtpToken, hashBackupCode, generateBackupCodes } from '../../core/generate-token.js'
+import { buildSession, validateSession } from '../../core/session.js'
+import { generatePkcePair, buildAuthorizationUrl } from '../../core/pkce.js'
+import { verifyTotpCode, buildTotpUri } from '../../core/totp.js'
+import { createAccessToken, hashRefreshToken, ACCESS_TOKEN_TTL_MS } from '../../core/jwt.js'
+import { requireRole, hasPermission, hasMinimumRole, type Action, type Resource } from '../../core/rbac.js'
+import { evaluateAbac, type AbacResult, type AbacPolicy, type AbacContext, type SubjectAttributes, type ResourceAttributes } from '../../core/abac.js'
+import type { DatabaseAdapter, User } from '../types.js'
+import type { Session } from '../../core/session.js'
 import type { ResolvedAuthConfig, OAuthProfile } from './framework-config.js'
 
 // ── Result types ──────────────────────────────────────────────
@@ -360,7 +360,7 @@ export async function handleOAuthCallback(
 
   // ── OIDC path: validate id_token, extract claims ───────────────
   if (isOIDC && idToken && provider.discoveryUrl) {
-    const { validateIdToken, extractEmailFromClaims, hasOIDC } = await import('../core/oidc.js')
+    const { validateIdToken, extractEmailFromClaims, hasOIDC } = await import('../../core/oidc.js')
     const clientId = provider.oidcClientId ?? provider.clientId
 
     let claims: Awaited<ReturnType<typeof validateIdToken>>

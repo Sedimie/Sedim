@@ -6,7 +6,9 @@ import { sha256 } from '@oslojs/crypto/sha2'
 // Web Crypto API — available in Node 18+, Deno, Bun, edge runtimes
 const secureRandom: RandomReader = {
   read(bytes: Uint8Array): void {
-    crypto.getRandomValues(bytes)
+    // Mutate bytes in-place with random values. The void suppresses the
+    // Uint8Array<ArrayBufferLike> return type incompatibility with ArrayBufferView<ArrayBuffer>.
+    void bytes.set(crypto.getRandomValues(new Uint8Array(bytes.length)))
   },
 }
 

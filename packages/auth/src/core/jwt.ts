@@ -15,13 +15,14 @@
 //   refresh_token — opaque random string, stored in DB, long-lived (30 days)
 //
 // This means:
-//   ✅ JWTs work for stateless API auth without DB roundtrips
-//   ✅ Refresh tokens can be revoked instantly (DB delete)
-//   ✅ Compromised JWTs expire automatically in 15 minutes
-//   ✅ Full session revocation works via the sessions table
+//   JWTs work for stateless API auth without DB roundtrips
+//   Refresh tokens can be revoked instantly (DB delete)
+//   Compromised JWTs expire automatically in 15 minutes
+//   Full session revocation works via the sessions table
 
-import { encodeBase32LowerCaseNoPadding, decodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
-import { createHMAC } from '@oslojs/crypto'
+import { encodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
+import { hmac as createHMAC } from '@oslojs/crypto/hmac'
+import { SHA256 } from '@oslojs/crypto/sha2'
 
 // ── Token shapes ────────────────────────────────────────────────
 
@@ -87,11 +88,13 @@ export function verifyAccessToken(
   if (parts.length !== 3) return null
 
   const [header, body, sig] = parts
+  if (!sig) return null  // sanity guard
   const expectedSig = hmacSign(`${header}.${body}`, secret)
   if (!timingSafeEquals(sig, expectedSig)) return null
 
   let payload: JwtAccessToken
   try {
+    if (!body) return null
     payload = JSON.parse(atob(body.replace(/-/g, '+').replace(/_/g, '/')))
   } catch {
     return null
@@ -133,7 +136,8 @@ export function createRefreshToken(
  * Hashes a refresh token for DB storage (never store the raw token).
  */
 export function hashRefreshToken(rawToken: string): string {
-  return createHMAC(rawToken, new TextEncoder().encode('refresh-token-v1'))
+  const hash = createHMAC(SHA256, new TextEncoder().encode('refresh-token-v1'), new TextEncoder().encode(rawToken))
+  return Buffer.from(hash).toString('hex')
 }
 
 // ── Low-level helpers ───────────────────────────────────────────
@@ -143,8 +147,8 @@ function base64urlEncode(input: string): string {
 }
 
 function hmacSign(msg: string, secret: string): string {
-  const sig = createHMAC(msg, new TextEncoder().encode(secret))
-  return base64urlEncode(String.fromCharCode(...sig))
+  const sig = createHMAC(SHA256, new TextEncoder().encode(secret), new TextEncoder().encode(msg))
+  return base64urlEncode(Array.from(sig).map(b => String.fromCharCode(b)).join(''))
 }
 
 function timingSafeEquals(a: string, b: string): boolean {

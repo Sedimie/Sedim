@@ -180,14 +180,15 @@ export function evaluateAbacWithDefaults(
  * Build a policy programmatically — useful for programmatic policy creation.
  */
 export function buildPolicy(p: Omit<AbacPolicy, 'id' | 'description'> & { id?: string; description?: string }): AbacPolicy {
-  return {
+  const policy: AbacPolicy = {
     id: p.id ?? crypto.randomUUID(),
     description: p.description ?? '',
     effect: p.effect,
-    subject: p.subject,
-    resource: p.resource,
-    action: p.action,
-    environment: p.environment,
-    condition: p.condition,
   }
+  if (p.subject !== undefined) policy.subject = p.subject
+  if (p.resource !== undefined) policy.resource = p.resource
+  if (p.action !== undefined) policy.action = p.action
+  if (p.environment !== undefined) policy.environment = p.environment
+  if (p.condition !== undefined) policy.condition = p.condition
+  return policy
 }

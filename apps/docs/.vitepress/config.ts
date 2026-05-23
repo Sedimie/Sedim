@@ -8,6 +8,7 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
     ['meta', { name: 'theme-color', content: '#2563eb' }],
   ],
+  srcDir:'src',
   themeConfig: {
     logo: '/logo.svg',
     siteTitle: 'Sedim',

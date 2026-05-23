@@ -76,9 +76,10 @@ export function decryptTotpSecret(encrypted: string, authSecret: string): string
 
   let nonce: Buffer, tag: Buffer, ciphertext: Buffer
   try {
-    nonce = base64urlDecode(parts[0])
-    tag = base64urlDecode(parts[1])
-    ciphertext = base64urlDecode(parts[2])
+    // parts length is guaranteed === 3 by the check above
+    nonce = base64urlDecode(parts[0]!)
+    tag = base64urlDecode(parts[1]!)
+    ciphertext = base64urlDecode(parts[2]!)
   } catch {
     return null
   }

@@ -1,15 +1,15 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { hashSessionToken } from '../core/generate-token.js'
-import { createRefreshToken } from '../core/jwt.js'
+import { hashSessionToken } from '../../core/generate-token.js'
+import { createRefreshToken } from '../../core/jwt.js'
 import { encodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
 
 function generateCsrfToken(): string {
   return encodeBase32LowerCaseNoPadding(crypto.getRandomValues(new Uint8Array(32)))
 }
-import type { User } from './types.js'
-import type { Session } from '../core/session.js'
+import type { User } from '../types.js'
+import type { Session } from '../../core/session.js'
 import type { AuthConfig } from './framework-config.js'
 import { resolveConfig } from './framework-config.js'
 import {
@@ -31,7 +31,7 @@ import {
   refreshAccessToken,
   revokeRefreshToken,
 } from './operations.js'
-import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../core/email-transport.js'
+import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../../core/email-transport.js'
 
 // ── Cookie helpers ────────────────────────────────────────────
 
@@ -401,6 +401,7 @@ export function createNextjsAuthHandlers(config: AuthConfig): {
 }
 
 function sanitizeUser(user: User): Omit<User, 'passwordHash'> {
-  const { passwordHash: _, ...safe } = user
-  return safe
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { passwordHash: _pass, ...safe } = user
+  return safe as Omit<User, 'passwordHash'>
 }

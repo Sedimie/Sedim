@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from '../types.js'
-import type { EmailTransportConfig } from '../core/email-transport.js'
-import type { RateLimitStore } from '../core/rate-limit-store.js'
+import type { EmailTransportConfig } from '../../core/email-transport.js'
+import { type RateLimitStore, InMemoryRateLimitStore } from '../../core/rate-limit-store.js'
 
 // ── OAuth provider config ─────────────────────────────────────
 
@@ -132,7 +132,13 @@ export interface AuthConfig {
   email?: EmailTransportConfig
 }
 
-export interface ResolvedAuthConfig extends Required<AuthConfig> {
+export interface ResolvedAuthConfig {
+  db: DatabaseAdapter
+  secret: string
+  providers: OAuthProviderConfig[]
+  cookieName: string
+  secureCookies: boolean
+  basePath: string
   providerMap: Map<string, OAuthProviderConfig>
   rateLimiter: { store: RateLimitStore }
   email: EmailTransportConfig
@@ -140,6 +146,7 @@ export interface ResolvedAuthConfig extends Required<AuthConfig> {
 
 export function resolveConfig(config: AuthConfig): ResolvedAuthConfig {
   const providers = config.providers ?? []
+  const store = config.rateLimiter?.store ?? new InMemoryRateLimitStore()
   return {
     ...config,
     providers,
@@ -147,7 +154,7 @@ export function resolveConfig(config: AuthConfig): ResolvedAuthConfig {
     cookieName: config.cookieName ?? 'auth_session',
     secureCookies: config.secureCookies ?? process.env['NODE_ENV'] === 'production',
     basePath: config.basePath ?? '/auth',
-    rateLimiter: config.rateLimiter ?? { store: new (require('../core/rate-limit-store.js').InMemoryRateLimitStore)() },
-    email: config.email ?? { transport: 'nodemailer', smtp: { host: process.env.SMTP_HOST!, port: parseInt(process.env.SMTP_PORT ?? '587'), user: process.env.SMTP_USER!, pass: process.env.SMTP_PASS!, from: process.env.SMTP_FROM } },
+    rateLimiter: { store },
+    email: config.email ?? { transport: 'nodemailer' as const, smtp: { host: process.env.SMTP_HOST!, port: parseInt(process.env.SMTP_PORT ?? '587'), user: process.env.SMTP_USER!, pass: process.env.SMTP_PASS!, from: process.env.SMTP_FROM ?? 'Sedim <noreply@sedim.dev>' } },
   }
 }

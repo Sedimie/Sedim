@@ -39,4 +39,4 @@ export type {
   EnvVarConfig,
   PeerContract,
   PlanConfig,
-} from './types'
+} from './types.js'

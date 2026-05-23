@@ -20,7 +20,7 @@
 // every request.
 
 import { createRemoteJWKSet, jwtVerify, decodeJwt } from 'jose'
-import type { JwtPayload } from 'jose'
+import type { JWTPayload } from 'jose'
 
 // ── Discovery cache ─────────────────────────────────────────────
 

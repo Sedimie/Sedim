@@ -1,9 +1,9 @@
 import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { hashSessionToken } from '../core/generate-token.js'
+import { hashSessionToken } from '../../core/generate-token.js'
 import { encodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
-import type { User } from './types.js'
-import type { Session } from '../core/session.js'
+import type { User } from '../types.js'
+import type { Session } from '../../core/session.js'
 import type { AuthConfig } from './framework-config.js'
 import { resolveConfig } from './framework-config.js'
 import {
@@ -25,7 +25,7 @@ import {
   refreshAccessToken,
   revokeRefreshToken,
 } from './operations.js'
-import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../core/email-transport.js'
+import { sendEmail, buildMagicLinkEmail, buildPasswordResetEmail } from '../../core/email-transport.js'
 
 // Hono context variable types
 type AuthVariables = {
