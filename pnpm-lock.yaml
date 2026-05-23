@@ -112,6 +112,9 @@ importers:
       '@types/node':
         specifier: ^25.6.2
         version: 25.6.2
+      figlet:
+        specifier: ^1.11.0
+        version: 1.11.0
       ts-morph:
         specifier: ^28.0.0
         version: 28.0.0
@@ -1705,6 +1708,11 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  figlet@1.11.0:
+    resolution: {integrity: sha512-EEx3OS/l2bFqcUNN2NM9FPJp8vAMrgbCxsbl2hbcJNNxOEwVe3mEzrhan7TbJQViZa8mMqhihlbCaqD+LyYKTQ==}
+    engines: {node: '>= 17.0.0'}
+    hasBin: true
 
   figures@6.1.0:
     resolution: {integrity: sha512-d+l3qxjSesT4V7v2fh+QnmFnUWv9lSpjarhShNTgBOfA0ttejbQUAlHLitbjkoRiDulW0OPoQPYIGhIC8ohejg==}
@@ -3882,6 +3890,10 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+
+  figlet@1.11.0:
+    dependencies:
+      commander: 14.0.3
 
   figures@6.1.0:
     dependencies:

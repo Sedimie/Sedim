@@ -4,3 +4,5 @@ dist/
 *.log
 .sedim/
 .next/
+cache/
+*.txt

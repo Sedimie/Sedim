@@ -19,14 +19,13 @@ export default defineConfig({
           environment: 'node',
         },
       },
-      // when auth package is added, add it here:
-      // {
-      //   test: {
-      //     name: 'auth',
-      //     include: ['packages/auth/tests/**/*.test.ts'],
-      //     environment: 'node',
-      //   },
-      // },
+      {
+        test: {
+          name: 'auth',
+          include: ['packages/auth/tests/**/*.test.ts'],
+          environment: 'node',
+        },
+      },
     ],
   },
 })
