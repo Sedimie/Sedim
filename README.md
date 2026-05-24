@@ -138,8 +138,9 @@ The stamped auth route handler lands at `src/app/api/auth/[...all]/route.ts` (Ne
 ## Auth Module
  
 Auth is the first Sedim module. It ships with everything, none of it is a black box.
- 
-![sedim add auth]()
+
+[Screencast from 2026-05-24 17-31-01.webm](https://github.com/user-attachments/assets/7f444748-d0bf-4329-a4cc-60507ae8b4df)
+
  
 ### Features
  
@@ -172,16 +173,15 @@ Auth is the first Sedim module. It ships with everything, none of it is a black 
 ### UI Tiers
  
 Three levels so you use your own design system or ship immediately.
- 
-![UI Tiers]()
+
+[Screencast from 2026-05-24 17-36-47.webm](https://github.com/user-attachments/assets/2c910cd5-8de8-4468-a2fd-db5011edd8d2)
+
  
 **Headless** - zero CSS, pure logic and markup. Bring your own styles.
  
 **Tailwind** - fully styled with Tailwind classes, works with your existing Tailwind config.
  
 **Themed** - pre-built themes with CSS tokens. Currently ships `minimal` and `glass`.
- 
-![Theme switcher]()
  
 ### Environment Variables
  
