@@ -8,7 +8,7 @@
     "sedim": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup --config tsup.config.ts && mkdir -p dist/fonts && cp node_modules/figlet/fonts/Block.flf dist/fonts/ && cp node_modules/figlet/fonts/Block.flf ./fonts/",
+    "build": "tsup --config tsup.config.ts && mkdir -p dist/fonts && cp node_modules/figlet/fonts/Block.flf dist/fonts/ && mkdir -p fonts && cp node_modules/figlet/fonts/Block.flf fonts/",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"

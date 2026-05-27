@@ -1,7 +1,7 @@
 # Sedim 
 ![Sedim Banner](/assets/banner.jpeg)
 
-[![Discord](https://img.shields.io/discord/YOUR_SERVER_ID?color=7289DA&logo=discord&logoColor=white&label=discord)](https://discord.gg/H7yutstM)
+[![Discord](https://img.shields.io/discord/1340085528308782080?color=7289DA&logo=discord&logoColor=white&label=discord)](https://discord.com/invite/H7yutstM)
 [![GitHub Stars](https://img.shields.io/github/stars/Sedimie/Sedim?style=flat&logo=github)](https://github.com/Sedimie/Sedim)
 [![npm downloads](https://img.shields.io/npm/dw/@sedim/cli?label=weekly%20downloads)](https://www.npmjs.com/package/@sedim/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
