@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "description": "Premium codegen CLI — stamp production-ready feature modules into your project",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "./dist/index.js",
   "bin": {
-    "sedim": "./src/index.ts"
+    "sedim": "./dist/index.js"
   },
   "scripts": {
+    "build": "tsup --config tsup.config.ts && cp -r node_modules/figlet/fonts dist/fonts && cp -r node_modules/figlet/fonts ./fonts",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -26,10 +27,10 @@
   ],
   "author": "Sedim <hello@sedim.dev>",
   "license": "MIT",
+  "files": ["dist", "fonts"],
+  "publishConfig": { "access": "public" },
   "dependencies": {
     "@clack/prompts": "^1.3.0",
-    "@sedim/auth": "workspace:*",
-    "@sedim/core": "workspace:*",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "diff": "^9.0.0",
@@ -41,6 +42,7 @@
     "@types/node": "^25.6.2",
     "figlet": "^1.11.0",
     "ts-morph": "^28.0.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }

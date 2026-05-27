@@ -25,6 +25,7 @@
     "@vitest/coverage-v8": "^4.1.6",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
+    "tsup": "^8.5.1",
     "turbo": "2.9.12",
     "vitest": "^4.1.6"
   },

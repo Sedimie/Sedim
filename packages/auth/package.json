@@ -1,23 +1,13 @@
 {
   "name": "@sedim/auth",
   "version": "0.2.0",
-  "description": "Auth module for sedim — stamps production-ready auth into your project",
+  "description": "Auth module source for sedim -- stamps production-ready auth into your project",
   "type": "module",
+  "private": true,
   "main": "./src/index.ts",
-  "exports": {
-    ".": "./src/index.ts",
-    "./core": "./src/core/index.ts",
-    "./adapters": "./src/adapters/index.ts",
-    "./plan-config": "./src/plan-config.ts",
-    "./schema": "./src/schema/index.ts",
-    "./contracts": "./src/contracts/index.ts"
-  },
   "scripts": {
     "test": "vitest run"
   },
-  "keywords": ["auth", "typescript", "nodejs", "express", "nextjs", "hono", "oauth", "totp", "rbac"],
-  "author": "Sedim <hello@sedim.dev>",
-  "license": "MIT",
   "dependencies": {
     "@oslojs/crypto": "^1.0.1",
     "@oslojs/encoding": "^1.1.0",
@@ -32,15 +22,9 @@
     "next": ">=14.0.0"
   },
   "peerDependenciesMeta": {
-    "express": {
-      "optional": true
-    },
-    "hono": {
-      "optional": true
-    },
-    "next": {
-      "optional": true
-    }
+    "express": { "optional": true },
+    "hono": { "optional": true },
+    "next": { "optional": true }
   },
   "devDependencies": {
     "@prisma/client": "^7.8.0",
