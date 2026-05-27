@@ -6,3 +6,4 @@ dist/
 .next/
 cache/
 *.txt
+packages/cli/fonts/
