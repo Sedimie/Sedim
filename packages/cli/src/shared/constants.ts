@@ -10,4 +10,4 @@ export const DEFAULT_REGISTRY_URL = 'https://raw.githubusercontent.com/sedimie/S
 export const DEFAULT_PACKAGES_URL = 'https://raw.githubusercontent.com/sedimie/Sedim/main/packages'
 
 export const MIN_NODE_VERSION = 18
-export const CLI_VERSION = '1.0.0'
+export const CLI_VERSION = '1.0.2'
