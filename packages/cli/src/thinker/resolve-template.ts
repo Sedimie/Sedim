@@ -44,16 +44,21 @@ export async function resolveTemplate(
 
   let content: string
 
-  // ── Remote fetch (GitHub raw content) ──────────────────────
-  // Try explicit template first, then verbatim source file.
-  const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
+  // Remote fetch (GitHub raw content)
+  // Try verbatim source first (the files exist at packages/<module>/src/<path>),
+  // then fall back to templates/ dir for UI-only content.
+  // Note: relPath may already contain an extension (e.g. "ui/themed/colorful-tokens.css")
+  // so we always try as-is first before appending any extension.
+  let found = false
 
-  const fetched = await tryFetch(templateUrl)
-  if (fetched !== null) {
-    content = fetched
+  // Try as-is (for files that already have their extension in the templateKey)
+  const asIsUrl = `${packagesUrl}/${moduleName}/src/${relPath}`
+  const asIsFetched = await tryFetch(asIsUrl)
+  if (asIsFetched !== null) {
+    content = asIsFetched
+    found = true
   } else {
-    // Try verbatim source: packages/<module>/src/<relPath>[.ts|.tsx|.css]
-    let found = false
+    // Try with each extension appended (for files without extension in templateKey)
     for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
       const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
       const raw = await tryFetch(url)
@@ -63,12 +68,31 @@ export async function resolveTemplate(
         break
       }
     }
-    if (!found) {
-      throw new Error(
-        `Template not found for key "${templateKey}". ` +
-          `Checked:\n  ${templateUrl}\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]`,
-      )
+  }
+
+  if (!found) {
+    // Try templates/ dir as fallback (for UI pages that live under templates/)
+    // Try as-is first for files with existing extensions, then with .ts appended
+    const templateAsIs = `${packagesUrl}/${moduleName}/src/templates/${relPath}`
+    const fetchedAsIs = await tryFetch(templateAsIs)
+    if (fetchedAsIs !== null) {
+      content = fetchedAsIs
+      found = true
+    } else {
+      const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
+      const fetched = await tryFetch(templateUrl)
+      if (fetched !== null) {
+        content = fetched
+        found = true
+      }
     }
+  }
+
+  if (!found) {
+    throw new Error(
+      `Template not found for key "${templateKey}". ` +
+        `Checked:\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]\n  ${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`,
+    )
   }
 
   // Apply substitutions and strip .js extensions
