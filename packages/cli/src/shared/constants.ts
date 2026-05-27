@@ -7,6 +7,7 @@ export const SEDIM_LOGS_DIR = `${SEDIM_DIR}/logs`
 export const SEDIM_LATEST_LOG = `${SEDIM_LOGS_DIR}/latest.log`
 
 export const DEFAULT_REGISTRY_URL = 'https://raw.githubusercontent.com/sedimie/Sedim/main/registry'
+export const DEFAULT_PACKAGES_URL = 'https://raw.githubusercontent.com/sedimie/Sedim/main/packages'
 
 export const MIN_NODE_VERSION = 18
 export const CLI_VERSION = '1.0.0'

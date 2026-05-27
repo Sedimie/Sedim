@@ -1,35 +1,26 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { existsSync } from 'fs'
 import type { DetectedContext } from '../planning/types'
-import { exists, readText } from '../shared/fs'
+import { DEFAULT_PACKAGES_URL } from '../shared/constants'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ── Template resolution ───────────────────────────────────────
-// Maps a templateKey to file content.
+// Fetches template content from the remote GitHub registry.
 //
-// Resolution order:
-//   1. packages/<module>/src/templates/<key>.ts  — substitution templates
-//   2. packages/<module>/src/<key>.ts            — verbatim source files
+// templateKey format: "auth/core/hash-password"
 //
-// The verbatim path is the key insight: most files don't need a separate
-// template — the source file IS the template. Only files that need
-// path substitution or config placeholders have explicit template files.
-
-// projectRoot is passed via ctx.structure. It is validated against sedim.config.ts
-// so it's a reliable anchor. We go 2 levels up from projectRoot to reach monorepo root,
-// then into packages/<module>/src.
-function getPackageRoot(projectRoot: string, moduleName: string): string {
-  // projectRoot → monorepo root (3 levels up from project root)
-  // then packages/<module>/src
-  return path.resolve(projectRoot, '..', '..', '..', 'packages', moduleName, 'src')
-}
+// Remote URLs:
+//   - templates/<module>/<key>.ts  → https://raw.githubusercontent.com/sedimie/Sedim/main/packages/<module>/src/templates/<key>.ts
+//   - verbatim: <module>/<key>.ts  → https://raw.githubusercontent.com/sedimie/Sedim/main/packages/<module>/src/<key>.ts
+//
+// The fetched content has {{PLACEHOLDER}} substitutions applied before being returned.
 
 export async function resolveTemplate(
   templateKey: string,
   ctx: DetectedContext,
   selectedFeatures: string[] = [],
+  packagesUrl = DEFAULT_PACKAGES_URL,
 ): Promise<string> {
   const [moduleName, ...rest] = templateKey.split('/')
   if (!moduleName || rest.length === 0) {
@@ -38,27 +29,8 @@ export async function resolveTemplate(
 
   const relPath = rest.join('/')
 
-  // Use projectRoot as anchor — it's validated and doesn't depend on __dirname
-  const projectRoot = ctx.projectRoot ?? process.cwd()
-  const packageRoot = getPackageRoot(projectRoot, moduleName)
-
-  // Fallback to __dirname-based resolution for older callers that don't have projectRoot
-  // This handles cases where ctx isn't fully populated
-  const tryPackageRoot = (levels: string) =>
-    path.resolve(__dirname, levels, 'packages', moduleName, 'src')
-  const packageRoot3 = tryPackageRoot('../../..')
-  const packageRoot4 = tryPackageRoot('../../../../..')
-  // Use projectRoot-based path if it exists, otherwise try __dirname paths
-  const resolvedRoot = existsSync(packageRoot)
-    ? packageRoot
-    : existsSync(packageRoot3)
-      ? packageRoot3
-      : existsSync(packageRoot4)
-        ? packageRoot4
-        : packageRoot
-
   // ── Special case: generated page content ─────────────────
-  // These keys produce fully generated content — no source file needed.
+  // These keys produce fully generated content — no network fetch needed.
   const generatedKeys: Record<string, (f: string[], c: DetectedContext) => string> = {
     'ui/pages/login-page': f => buildLoginPage(f),
     'ui/pages/signup-page': f => buildSignupPage(f),
@@ -72,70 +44,50 @@ export async function resolveTemplate(
 
   let content: string
 
-  // 1. explicit substitution template
-  const templatePath = path.join(resolvedRoot, 'templates', `${relPath}.ts`)
-  if (await exists(templatePath)) {
-    const raw = await readText(templatePath)
-    content = applySubstitutions(raw, ctx, selectedFeatures)
-  } else {
-    const templatePrismaPath = path.join(resolvedRoot, 'templates', `${relPath}.prisma`)
-    if (await exists(templatePrismaPath)) {
-      const raw = await readText(templatePrismaPath)
-      content = applySubstitutions(raw, ctx, selectedFeatures)
-    } else {
-      // 2. verbatim source file
-      const knownExts = ['.ts', '.tsx', '.css', '.prisma']
-      const hasExt = knownExts.some(e => relPath.endsWith(e))
+  // ── Remote fetch (GitHub raw content) ──────────────────────
+  // Try explicit template first, then verbatim source file.
+  const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
 
-      if (hasExt) {
-        const sourcePath = path.join(resolvedRoot, relPath)
-        if (await exists(sourcePath)) {
-          content = await readText(sourcePath)
-          // Apply substitutions to all source files — they may contain
-          // {{VAR}} placeholders that need resolving (e.g. API_BASE_PATH).
-          content = applySubstitutions(content, ctx, selectedFeatures)
-        } else {
-          content = ''
-        }
-      } else {
-        let found = false
-        content = ''
-        for (const ext of ['.ts', '.tsx', '.css']) {
-          const sourcePath = path.join(resolvedRoot, `${relPath}${ext}`)
-          if (await exists(sourcePath)) {
-            const raw = await readText(sourcePath)
-            content = applySubstitutions(raw, ctx, selectedFeatures)
-            found = true
-            break
-          }
-        }
-        if (!found) {
-          const sourcePrismaPath = path.join(resolvedRoot, `${relPath}.prisma`)
-          if (await exists(sourcePrismaPath)) {
-            content = await readText(sourcePrismaPath)
-          } else {
-            throw new Error(
-              `Template not found for key "${templateKey}". ` +
-                `Checked:\n  ${templatePath}\n  ${path.join(resolvedRoot, relPath)}.[ts|tsx|css]`,
-            )
-          }
-        }
+  const fetched = await tryFetch(templateUrl)
+  if (fetched !== null) {
+    content = fetched
+  } else {
+    // Try verbatim source: packages/<module>/src/<relPath>[.ts|.tsx|.css]
+    let found = false
+    for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
+      const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
+      const raw = await tryFetch(url)
+      if (raw !== null) {
+        content = raw
+        found = true
+        break
       }
+    }
+    if (!found) {
+      throw new Error(
+        `Template not found for key "${templateKey}". ` +
+          `Checked:\n  ${templateUrl}\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]`,
+      )
     }
   }
 
-  // ── Strip .js extensions from relative imports ────────────
-  // Next.js (Turbopack/webpack) and other bundlers resolve imports
-  // literally — they won't map './foo.js' to './foo.ts'.
-  // Node ESM needs .js extensions; bundlers don't. Since stamped files
-  // live inside a bundler project, strip them.
-  // Only strip from relative imports (starting with ./ or ../) to avoid
-  // touching third-party package imports like 'drizzle-orm/neon-http'.
+  // Apply substitutions and strip .js extensions
+  content = applySubstitutions(content, ctx, selectedFeatures)
   if (!relPath.endsWith('.css') && !relPath.endsWith('.prisma')) {
     content = stripRelativeJsExtensions(content)
   }
 
   return content
+}
+
+async function tryFetch(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return res.text()
+  } catch {
+    return null
+  }
 }
 
 // ── Substitution variables ────────────────────────────────────
@@ -321,7 +273,7 @@ function buildLoginPage(features: string[]): string {
       `      <p style={{ textAlign: 'center', fontSize: '0.8125rem', color: '${mutedColor}', margin: 0 }}>`,
     )
     body.push(
-      `        Don&apos;t have an account?{' '}<a href="/signup" style={{ color: '${fgColor}', fontWeight: 600, textDecoration: 'none' }}>Sign up</a>`,
+      `        Don't have an account?{' '}<a href="/signup" style={{ color: '${fgColor}', fontWeight: 600, textDecoration: 'none' }}>Sign up</a>`,
     )
     body.push(`      </p>`)
   }
@@ -503,7 +455,7 @@ function buildForgotPage(features: string[] = []): string {
   const inner = [
     `        <div style={{ textAlign: 'center' }}>`,
     `          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.25rem' }}>Reset password</h1>`,
-    `          <p style={{ fontSize: '0.875rem', color: '${mutedColor}', margin: 0 }}>Enter your email and we&apos;ll send a reset link.</p>`,
+    `          <p style={{ fontSize: '0.875rem', color: '${mutedColor}', margin: 0 }}>Enter your email and we'll send a reset link.</p>`,
     `        </div>`,
     `        <ForgotPasswordForm />`,
     `        <p style={{ textAlign: 'center', fontSize: '0.8125rem', margin: 0 }}>`,

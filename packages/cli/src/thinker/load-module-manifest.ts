@@ -15,6 +15,7 @@ export async function loadModuleManifest(
   registryUrl = DEFAULT_REGISTRY_URL,
 ): Promise<ModuleManifest> {
   // local registry — walk up from cli/src/thinker to repo root
+  // ./src/thinker/load-module-manifest.ts → ./src → ./packages → ./packages/cli → ./Sedim/registry
   const localPath = path.resolve(__dirname, '../../../../registry', moduleName, 'latest.json')
   if (await exists(localPath)) {
     try {
