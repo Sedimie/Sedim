@@ -1,9 +1,14 @@
 import path from 'node:path'
-import { Project, QuoteKind, VariableDeclarationKind } from 'ts-morph'
 import type { DetectedContext, SedimConfig } from '../planning/types'
 import { CLI_VERSION, SEDIM_CONFIG_CACHE, SEDIM_CONFIG_FILE } from '../shared/constants'
 import { WriteError } from '../shared/errors'
 import { writeJSON } from '../shared/fs'
+
+async function loadTsMorph() {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  const { Project, QuoteKind, VariableDeclarationKind } = await import('ts-morph')
+  return { Project, QuoteKind, VariableDeclarationKind }
+}
 
 // builds a SedimConfig from detected context + user choices
 export function buildConfig(
@@ -44,6 +49,7 @@ export async function writeSedimConfig(projectRoot: string, config: SedimConfig)
 // writes sedim.config.ts as a proper TypeScript object literal using ts-morph
 // so the output looks like hand-written TS, not a JSON blob
 async function writeConfigTs(projectRoot: string, config: SedimConfig): Promise<void> {
+  const { Project, QuoteKind, VariableDeclarationKind } = await loadTsMorph()
   const project = new Project({
     manipulationSettings: { quoteKind: QuoteKind.Single },
     useInMemoryFileSystem: true,
@@ -106,7 +112,7 @@ function buildObjectLiteral(value: unknown): string {
     const entries = Object.entries(value as Record<string, unknown>)
     if (entries.length === 0) return '{}'
     const props = entries.map(([k, v]) => `  ${k}: ${buildObjectLiteral(v)}`).join(',\n')
-    return `{\n${props},\n}`
+    return `{\n${props}\n}`
   }
 
   return String(value)

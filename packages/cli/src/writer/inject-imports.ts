@@ -1,7 +1,12 @@
 import path from 'node:path'
-import { Project } from 'ts-morph'
 import { WriteError } from '../shared/errors'
 import { exists, readText, writeText } from '../shared/fs'
+
+async function loadTsMorph() {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  const { Project } = await import('ts-morph')
+  return { Project }
+}
 
 // adds an import statement to a file without duplicating it
 // uses ts-morph to find the last existing import and insert after it
@@ -22,6 +27,7 @@ export async function injectImport(
   }
 
   try {
+    const { Project } = await loadTsMorph()
     const project = new Project({
       skipAddingFilesFromTsConfig: true,
       compilerOptions: { allowJs: true },

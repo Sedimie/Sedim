@@ -1,13 +1,6 @@
 import path from 'node:path'
-import { Node, Project, SyntaxKind } from 'ts-morph'
 import type { CodeArchitecture, InjectionAnchor, InjectionType } from '../planning/types'
 import { exists } from '../shared/fs'
-
-// ============================================================
-// detect-code-architecture
-// uses ts-morph AST analysis to find precise injection points
-// not just file presence — actual code locations
-// ============================================================
 
 export async function detectCodeArchitecture(projectRoot: string): Promise<CodeArchitecture> {
   const [
@@ -28,8 +21,6 @@ export async function detectCodeArchitecture(projectRoot: string): Promise<CodeA
     resolveImportStyle(projectRoot),
   ])
 
-  // AST-based injection anchor detection
-  // only runs on files that actually exist
   const injectionAnchors = await resolveInjectionAnchors(projectRoot, {
     layoutStyle,
     appEntrypoint,
@@ -47,10 +38,6 @@ export async function detectCodeArchitecture(projectRoot: string): Promise<CodeA
     injectionAnchors,
   }
 }
-
-// ============================================================
-// File presence checks (unchanged from before)
-// ============================================================
 
 async function resolveRouterStyle(projectRoot: string): Promise<CodeArchitecture['routerStyle']> {
   if (
@@ -73,13 +60,11 @@ async function resolveLayoutStyle(projectRoot: string): Promise<CodeArchitecture
     (await exists(path.join(projectRoot, 'app/layout.tsx')))
   )
     return 'app-router'
-
   if (
     (await exists(path.join(projectRoot, 'src/pages/_app.tsx'))) ||
     (await exists(path.join(projectRoot, 'pages/_app.tsx')))
   )
     return 'pages-router'
-
   return 'unknown'
 }
 
@@ -98,18 +83,27 @@ async function resolveAppEntrypoint(
     const filePath = path.join(projectRoot, candidate)
     if (await exists(filePath)) {
       try {
-        // use ts-morph to check for framework instance exports
-        const project = createProject()
+        const { Project } = await loadTsMorph()
+        const project = new Project({
+          skipAddingFilesFromTsConfig: true,
+          compilerOptions: { allowJs: true },
+        })
         const sf = project.addSourceFileAtPath(filePath)
         const exportsApp = sf
           .getVariableDeclarations()
-          .some(v => /express|fastify|new Hono/.test(v.getInitializerOrThrow()?.getText() ?? ''))
-        const exportName =
-          sf
-            .getVariableDeclarations()
-            .find(v => /express|fastify|new Hono/.test(v.getInitializerOrThrow()?.getText() ?? ''))
-            ?.getName() ?? null
-        return { file: candidate, exportsAppInstance: exportsApp, exportName }
+          .some((v: { getInitializerOrThrow: () => { getText: () => string } }) =>
+            /express|fastify|new Hono/.test(v.getInitializerOrThrow()?.getText() ?? ''),
+          )
+        const exportEntry = sf
+          .getVariableDeclarations()
+          .find((v: { getInitializerOrThrow: () => { getText: () => string } }) =>
+            /express|fastify|new Hono/.test(v.getInitializerOrThrow()?.getText() ?? ''),
+          )
+        return {
+          file: candidate,
+          exportsAppInstance: exportsApp,
+          exportName: exportEntry?.getName() ?? null,
+        }
       } catch {
         return { file: candidate, exportsAppInstance: false, exportName: null }
       }
@@ -147,7 +141,11 @@ async function resolveImportStyle(projectRoot: string): Promise<CodeArchitecture
     const filePath = path.join(projectRoot, candidate)
     if (await exists(filePath)) {
       try {
-        const project = createProject()
+        const { Project } = await loadTsMorph()
+        const project = new Project({
+          skipAddingFilesFromTsConfig: true,
+          compilerOptions: { allowJs: true },
+        })
         const sf = project.addSourceFileAtPath(filePath)
         const hasNamed = sf.getExportedDeclarations().size > 0
         const hasDefault = sf.getDefaultExportSymbol() !== undefined
@@ -162,11 +160,6 @@ async function resolveImportStyle(projectRoot: string): Promise<CodeArchitecture
   return 'named'
 }
 
-// ============================================================
-// AST-based injection anchor resolution
-// this is the new part — finds precise code locations
-// ============================================================
-
 async function resolveInjectionAnchors(
   projectRoot: string,
   ctx: {
@@ -177,36 +170,26 @@ async function resolveInjectionAnchors(
 ): Promise<Partial<Record<InjectionType, InjectionAnchor>>> {
   const anchors: Partial<Record<InjectionType, InjectionAnchor>> = {}
 
-  // provider-wrap anchor — Next.js app router layout
   if (ctx.layoutStyle === 'app-router') {
-    const layoutAnchor = await findProviderWrapAnchor(projectRoot)
-    if (layoutAnchor) anchors['provider-wrap'] = layoutAnchor
+    const anchor = await findProviderWrapAnchor(projectRoot)
+    if (anchor) anchors['provider-wrap'] = anchor
   }
-
-  // provider-wrap anchor — Next.js pages router _app
   if (ctx.layoutStyle === 'pages-router') {
-    const appAnchor = await findPagesAppAnchor(projectRoot)
-    if (appAnchor) anchors['provider-wrap'] = appAnchor
+    const anchor = await findPagesAppAnchor(projectRoot)
+    if (anchor) anchors['provider-wrap'] = anchor
   }
-
-  // middleware anchor — Express/Hono/Fastify app entry
   if (ctx.appEntrypoint) {
-    const middlewareAnchor = await findMiddlewareAnchor(projectRoot, ctx.appEntrypoint.file)
-    if (middlewareAnchor) anchors['middleware'] = middlewareAnchor
+    const mwAnchor = await findMiddlewareAnchor(projectRoot, ctx.appEntrypoint.file)
+    if (mwAnchor) anchors['middleware'] = mwAnchor
   }
-
-  // route anchor — Express/Hono app entry
   if (ctx.appEntrypoint) {
     const routeAnchor = await findRouteAnchor(projectRoot, ctx.appEntrypoint.file)
     if (routeAnchor) anchors['route'] = routeAnchor
   }
 
-  // import anchor — any file gets imports added at the end of the import block
-  // this is resolved per-file at write time, not here
-  // but we record the pattern the writer should use
   anchors['import'] = {
-    file: '', // resolved per-file by the writer
-    anchorText: '', // last import statement — found by writer
+    file: '',
+    anchorText: '',
     position: 'after',
     description: 'after last import statement in file',
   }
@@ -214,36 +197,32 @@ async function resolveInjectionAnchors(
   return anchors
 }
 
-// finds where to wrap children in Next.js app router layout
-// looks for the <body> tag's children or the return statement's JSX root
 async function findProviderWrapAnchor(projectRoot: string): Promise<InjectionAnchor | null> {
   const candidates = ['src/app/layout.tsx', 'src/app/layout.ts', 'app/layout.tsx']
-
   for (const candidate of candidates) {
     const filePath = path.join(projectRoot, candidate)
     if (!(await exists(filePath))) continue
-
     try {
-      const project = createProject()
+      const { Project, SyntaxKind } = await loadTsMorph()
+      const project = new Project({
+        skipAddingFilesFromTsConfig: true,
+        compilerOptions: { allowJs: true, jsx: 4 },
+      })
       const sf = project.addSourceFileAtPath(filePath)
-
-      // find <body> JSX element — the children inside it is where providers wrap
       const bodyElements = sf
         .getDescendantsOfKind(SyntaxKind.JsxOpeningElement)
-        .filter(el => el.getTagNameNode().getText() === 'body')
-
+        .filter(
+          (el: { getTagNameNode: () => { getText: () => string } }) =>
+            el.getTagNameNode().getText() === 'body',
+        )
       if (bodyElements.length > 0) {
-        // anchor on the opening <body> tag text
-        const bodyText = bodyElements[0].getText()
         return {
           file: candidate,
-          anchorText: bodyText,
+          anchorText: bodyElements[0].getText(),
           position: 'after',
           description: 'after <body> opening tag in root layout',
         }
       }
-
-      // fallback — anchor on the return statement if no <body> found
       const returnStatements = sf.getDescendantsOfKind(SyntaxKind.ReturnStatement)
       if (returnStatements.length > 0) {
         return {
@@ -254,29 +233,29 @@ async function findProviderWrapAnchor(projectRoot: string): Promise<InjectionAnc
         }
       }
     } catch {
-      /* unreadable or not valid TS */
+      /* unreadable */
     }
   }
-
   return null
 }
 
-// finds where to wrap Component in Next.js pages router _app
 async function findPagesAppAnchor(projectRoot: string): Promise<InjectionAnchor | null> {
   const candidates = ['src/pages/_app.tsx', 'pages/_app.tsx']
-
   for (const candidate of candidates) {
     const filePath = path.join(projectRoot, candidate)
     if (!(await exists(filePath))) continue
-
     try {
-      const project = createProject()
+      const { Project, SyntaxKind } = await loadTsMorph()
+      const project = new Project({
+        skipAddingFilesFromTsConfig: true,
+        compilerOptions: { allowJs: true },
+      })
       const sf = project.addSourceFileAtPath(filePath)
-
-      // look for <Component {...pageProps} /> — standard _app pattern
       const jsxElements = sf.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement)
-      const componentEl = jsxElements.find(el => el.getTagNameNode().getText() === 'Component')
-
+      const componentEl = jsxElements.find(
+        (el: { getTagNameNode: () => { getText: () => string } }) =>
+          el.getTagNameNode().getText() === 'Component',
+      )
       if (componentEl) {
         return {
           file: candidate,
@@ -289,58 +268,50 @@ async function findPagesAppAnchor(projectRoot: string): Promise<InjectionAnchor 
       /* unreadable */
     }
   }
-
   return null
 }
 
-// finds where to register middleware in Express/Hono/Fastify entry
 async function findMiddlewareAnchor(
   projectRoot: string,
   entryFile: string,
 ): Promise<InjectionAnchor | null> {
   const filePath = path.join(projectRoot, entryFile)
   if (!(await exists(filePath))) return null
-
   try {
-    const project = createProject()
-    const sf = project.addSourceFileAtPath(filePath)
-
-    // find all app.use() calls — middleware goes after the last one
-    const useCallExpressions = sf.getDescendantsOfKind(SyntaxKind.CallExpression).filter(call => {
-      const expr = call.getExpression()
-      return Node.isPropertyAccessExpression(expr) && expr.getName() === 'use'
+    const { Project, SyntaxKind, Node } = await loadTsMorph()
+    const project = new Project({
+      skipAddingFilesFromTsConfig: true,
+      compilerOptions: { allowJs: true },
     })
-
+    const sf = project.addSourceFileAtPath(filePath)
+    const useCallExpressions = sf
+      .getDescendantsOfKind(SyntaxKind.CallExpression)
+      .filter((call: { getExpression: () => { getName: () => string } }) => {
+        const expr = call.getExpression()
+        return Node.isPropertyAccessExpression(expr) && expr.getName() === 'use'
+      })
     if (useCallExpressions.length > 0) {
-      // anchor after the last app.use() call
       const lastUse = useCallExpressions[useCallExpressions.length - 1]
-      // get the full statement text (includes the semicolon)
       const statement = lastUse.getParentIfKind(SyntaxKind.ExpressionStatement)
-      const anchorText = statement?.getText() ?? lastUse.getText()
-
       return {
         file: entryFile,
-        anchorText,
+        anchorText: statement?.getText() ?? lastUse.getText(),
         position: 'after',
         description: 'after last app.use() middleware registration',
       }
     }
-
-    // no app.use() found — anchor after the app instance declaration
     const appDecl = sf
       .getVariableDeclarations()
-      .find(v =>
+      .find((v: { getInitializerOrThrow: () => { getText: () => string } }) =>
         /express\(\)|new Hono|fastify\(\)/.test(v.getInitializerOrThrow()?.getText() ?? ''),
       )
-
     if (appDecl) {
       const statement = appDecl
-        .getParentIfKind(SyntaxKind.VariableDeclarationList)
-        ?.getParentIfKind(SyntaxKind.VariableStatement)
-      const anchorText = statement?.getText() ?? appDecl.getText()
+        .getParentIfKind?.(SyntaxKind.VariableDeclarationList)
+        ?.getParentIfKind?.(SyntaxKind.VariableStatement)
       return {
         file: entryFile,
-        anchorText,
+        anchorText: statement?.getText() ?? appDecl.getText(),
         position: 'after',
         description: 'after app instance declaration',
       }
@@ -348,44 +319,43 @@ async function findMiddlewareAnchor(
   } catch {
     /* unreadable */
   }
-
   return null
 }
 
-// finds where to register routes in Express/Hono/Fastify entry
 async function findRouteAnchor(
   projectRoot: string,
   entryFile: string,
 ): Promise<InjectionAnchor | null> {
   const filePath = path.join(projectRoot, entryFile)
   if (!(await exists(filePath))) return null
-
   try {
-    const project = createProject()
+    const { Project, SyntaxKind, Node } = await loadTsMorph()
+    const project = new Project({
+      skipAddingFilesFromTsConfig: true,
+      compilerOptions: { allowJs: true },
+    })
     const sf = project.addSourceFileAtPath(filePath)
-
-    // find route registrations: app.get/post/put/delete/use with path strings
     const routeCalls = sf
       .getDescendantsOfKind(SyntaxKind.CallExpression)
-      .filter(call => {
+      .filter((call: { getExpression: () => unknown }) => {
         const expr = call.getExpression()
         if (!Node.isPropertyAccessExpression(expr)) return false
-        const method = expr.getName()
-        return ['get', 'post', 'put', 'delete', 'patch', 'use', 'route'].includes(method)
+        return ['get', 'post', 'put', 'delete', 'patch', 'use', 'route'].includes(
+          (expr as { getName: () => string }).getName(),
+        )
       })
-      // only calls where first arg is a string (path) — filters out middleware-only use()
-      .filter(call => {
+      .filter((call: { getArguments: () => unknown[] }) => {
         const firstArg = call.getArguments()[0]
-        return firstArg && Node.isStringLiteral(firstArg)
+        return (
+          firstArg && Node.isStringLiteral(firstArg as Parameters<typeof Node.isStringLiteral>[0])
+        )
       })
-
     if (routeCalls.length > 0) {
       const lastRoute = routeCalls[routeCalls.length - 1]
       const statement = lastRoute.getParentIfKind(SyntaxKind.ExpressionStatement)
-      const anchorText = statement?.getText() ?? lastRoute.getText()
       return {
         file: entryFile,
-        anchorText,
+        anchorText: statement?.getText() ?? lastRoute.getText(),
         position: 'after',
         description: 'after last route registration',
       }
@@ -393,22 +363,11 @@ async function findRouteAnchor(
   } catch {
     /* unreadable */
   }
-
   return null
 }
 
-// ============================================================
-// shared ts-morph project factory
-// skipAddingFilesFromTsConfig: true — we add files manually
-// we don't want ts-morph scanning the whole project on every call
-// ============================================================
-
-function createProject(): Project {
-  return new Project({
-    skipAddingFilesFromTsConfig: true,
-    compilerOptions: {
-      allowJs: true,
-      jsx: 4, // JsxEmit.ReactJSX
-    },
-  })
+async function loadTsMorph() {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  const { Project, SyntaxKind, Node } = await import('ts-morph')
+  return { Project, SyntaxKind, Node }
 }

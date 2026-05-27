@@ -1,5 +1,4 @@
 import path from 'node:path'
-import { Project, SyntaxKind } from 'ts-morph'
 import type { Detected, Framework } from '../planning/types'
 import { exists, readJSON } from '../shared/fs'
 
@@ -61,7 +60,6 @@ export async function detectFramework(projectRoot: string): Promise<Detected<Fra
 
     if (found.length === 1) {
       depFramework = found[0]
-      // for Next.js, deps alone are enough — no entry file to scan
       if (depFramework === 'nextjs') {
         return { value: 'nextjs', confidence: 'medium', evidence }
       }
@@ -71,19 +69,16 @@ export async function detectFramework(projectRoot: string): Promise<Detected<Fra
   }
 
   // AST pass — for Express/Hono/Fastify which have no config files
-  // scan likely entry files for framework instantiation calls
-  // upgrades confidence from medium to high if found
   if (depFramework && depFramework !== 'nextjs') {
     const astResult = await detectFrameworkFromAST(projectRoot, depFramework)
     if (astResult) {
       evidence.push(astResult)
       return { value: depFramework, confidence: 'high', evidence }
     }
-    // dep found but no AST confirmation — medium confidence
     return { value: depFramework, confidence: 'medium', evidence }
   }
 
-  // no deps found — try AST scan anyway in case deps are missing
+  // no deps found — try AST scan anyway
   const astFramework = await detectAnyFrameworkFromAST(projectRoot, evidence)
   if (astFramework) {
     return { value: astFramework, confidence: 'medium', evidence }
@@ -93,8 +88,6 @@ export async function detectFramework(projectRoot: string): Promise<Detected<Fra
   return { value: 'unknown', confidence: 'low', evidence }
 }
 
-// scans entry files for a specific framework's instantiation pattern
-// returns a description string if found, null if not
 async function detectFrameworkFromAST(
   projectRoot: string,
   framework: Framework,
@@ -133,27 +126,30 @@ async function detectFrameworkFromAST(
     if (!(await exists(filePath))) continue
 
     try {
+      const { Project, SyntaxKind } = await loadTsMorph()
       const project = new Project({
         skipAddingFilesFromTsConfig: true,
         compilerOptions: { allowJs: true },
       })
       const sf = project.addSourceFileAtPath(filePath)
 
-      // look for call expressions matching the framework instantiation
-      // express() — CallExpression where expression is Identifier 'express'
-      // new Hono() — NewExpression where expression is Identifier 'Hono'
-      // fastify() — CallExpression where expression is Identifier 'fastify'
       const isNewExpr = framework === 'hono'
 
       if (isNewExpr) {
         const found = sf
           .getDescendantsOfKind(SyntaxKind.NewExpression)
-          .some(n => n.getExpression().getText() === pattern.call)
+          .some(
+            (n: { getExpression: () => { getText: () => string } }) =>
+              n.getExpression().getText() === pattern.call,
+          )
         if (found) return `found "new ${pattern.call}()" in ${file}`
       } else {
         const found = sf
           .getDescendantsOfKind(SyntaxKind.CallExpression)
-          .some(c => c.getExpression().getText() === pattern.call)
+          .some(
+            (c: { getExpression: () => { getText: () => string } }) =>
+              c.getExpression().getText() === pattern.call,
+          )
         if (found) return `found "${pattern.call}()" call in ${file}`
       }
     } catch {
@@ -164,7 +160,6 @@ async function detectFrameworkFromAST(
   return null
 }
 
-// tries all non-Next.js frameworks via AST when no deps were found
 async function detectAnyFrameworkFromAST(
   projectRoot: string,
   evidence: string[],
@@ -178,4 +173,10 @@ async function detectAnyFrameworkFromAST(
     }
   }
   return null
+}
+
+async function loadTsMorph() {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  const { Project, SyntaxKind } = await import('ts-morph')
+  return { Project, SyntaxKind }
 }
