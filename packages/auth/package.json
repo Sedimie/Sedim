@@ -6,6 +6,7 @@
   "private": true,
   "main": "./src/index.ts",
   "scripts": {
+    "build:plan": "tsup src/plan-config.ts --format esm --outDir planConfig --no-dts --clean",
     "test": "vitest run"
   },
   "dependencies": {
