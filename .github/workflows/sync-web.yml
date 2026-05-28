@@ -26,7 +26,7 @@ jobs:
             git checkout -b main origin/main
           else
             git checkout --orphan main
-            git rm -rf .
+            git reset --hard
           fi
 
       - name: Sync apps/web to sedim-web
