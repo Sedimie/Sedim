@@ -17,24 +17,16 @@ jobs:
 
       - name: Setup sedim-web repo
         run: |
-          mkdir -p web
+          git init web
           cd web
-          git init
+          git config user.email "bot@sedim.io"
+          git config user.name "Sedim Bot"
           git remote add origin https://x-access-token:${{ secrets.SEDIM_WEB_PAT }}@github.com/Sedimie/sedim-web.git
-          git fetch origin
-          if git rev-parse --verify --quiet origin/main; then
-            git checkout -b main origin/main
-          else
-            git checkout --orphan main
-            git reset --hard
-          fi
 
-      - name: Sync apps/web to sedim-web
-        run: cp -r monorepo/apps/web/. web/
-
-      - name: Commit and push
+      - name: Sync and push
         run: |
+          cp -r monorepo/apps/web/. web/
           cd web
           git add .
-          git commit -m "chore: sync from monorepo" || echo "No changes to commit"
-          git push origin main --force
+          git commit -m "chore: sync from monorepo" || echo "Nothing to commit"
+          git push -f origin HEAD:main
