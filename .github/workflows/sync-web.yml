@@ -1,0 +1,36 @@
+name: Sync Web to Deploy Repo
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/web/**']
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+        with:
+          path: monorepo
+
+      - name: Checkout sedim-web
+        uses: actions/checkout@v4
+        with:
+          repository: Sedimie/sedim-web
+          path: web
+          token: ${{ secrets.SEDIM_WEB_PAT }}
+
+      - name: Sync apps/web to sedim-web
+        run: |
+          rm -rf web/*
+          cp -r monorepo/apps/web/. web/
+
+      - name: Commit and push
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: sync from monorepo"
+          file_pattern: "*"
+          repository_path: web
+          commit_user_name: Sedim Bot
+          commit_user_email: bot@sedim.io
