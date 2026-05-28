@@ -15,17 +15,22 @@ jobs:
         with:
           path: monorepo
 
-      - name: Checkout sedim-web
-        uses: actions/checkout@v4
-        with:
-          repository: Sedimie/sedim-web
-          path: web
-          token: ${{ secrets.SEDIM_WEB_PAT }}
+      - name: Setup sedim-web repo
+        run: |
+          mkdir -p web
+          cd web
+          git init
+          git remote add origin https://x-access-token:${{ secrets.SEDIM_WEB_PAT }}@github.com/Sedimie/sedim-web.git
+          git fetch origin
+          if git rev-parse --verify --quiet origin/main; then
+            git checkout -b main origin/main
+          else
+            git checkout --orphan main
+            git rm -rf .
+          fi
 
       - name: Sync apps/web to sedim-web
-        run: |
-          rm -rf web/*
-          cp -r monorepo/apps/web/. web/
+        run: cp -r monorepo/apps/web/. web/
 
       - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v5
