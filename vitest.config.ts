@@ -15,7 +15,7 @@ export default defineConfig({
         // cli package tests
         test: {
           name: 'cli',
-          include: ['packages/cli/tests/**/*.test.ts'],
+          include: ['packages/cli/__tests__/**/*.test.ts'],
           environment: 'node',
         },
       },
