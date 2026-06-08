@@ -19,8 +19,13 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "~/*": ["./src/*"],
+      "content": ["./.velite"],
+      "content/*": ["./.velite/*"]
+    }
   },
-  "include": ["src", ".next/types/**/*.ts"],
+  "include": ["src", ".velite", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
