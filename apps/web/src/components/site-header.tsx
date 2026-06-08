@@ -6,7 +6,7 @@ import { Brand } from '~/components/brand'
 import { navLinks } from '~/lib/site-data'
 
 type SiteHeaderProps = {
-  active?: 'docs' | 'blog'
+  active?: 'docs' | 'guides' | 'reference' | 'blog'
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
@@ -29,8 +29,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         <nav className="header-nav" aria-label="Primary">
           {navLinks.map(link => {
             const isActive =
-              (link.label === 'Docs' && active === 'docs') ||
-              (link.label === 'Blog' && active === 'blog')
+              'activeKey' in link && link.activeKey === active
 
             if ('external' in link && link.external) {
               return (

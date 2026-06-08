@@ -21,7 +21,6 @@ import {
   authRoadmap,
   commands,
   comparisons,
-  groundwork,
   heroTagline,
   philosophyPillars,
   stackSupport,
@@ -375,30 +374,6 @@ export function LandingPage() {
                   <span className="command-row-desc">{cmd.description}</span>
                 </div>
               ))}
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ── Groundwork ── */}
-      <section id="groundwork" className="section section-groundwork">
-        <div className="container">
-          <ScrollReveal>
-            <div className="groundwork-block doodle-card">
-              <p className="eyebrow">{groundwork.title}</p>
-              <h2 className="groundwork-title">
-                RFC-grade docs for{' '}
-                <span className="display-italic">full-stack features</span>
-              </h2>
-              <p className="groundwork-desc">{groundwork.description}</p>
-              <ul className="groundwork-points">
-                {groundwork.points.map(p => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-              <Link href={groundwork.href} className="btn btn-secondary btn-lg">
-                Browse Groundwork guides
-              </Link>
             </div>
           </ScrollReveal>
         </div>

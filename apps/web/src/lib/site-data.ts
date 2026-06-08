@@ -62,8 +62,10 @@ export const stampedFileTree = [
 export const INSTALL_CMD = 'npm i -g @sedim/cli'
 
 export const navLinks = [
-  { label: 'Docs', href: '/docs' },
-  { label: 'Blog', href: '/blog' },
+  { label: 'Docs', href: '/docs', activeKey: 'docs' as const },
+  { label: 'Guides', href: '/guides', activeKey: 'guides' as const },
+  { label: 'Reference', href: '/reference', activeKey: 'reference' as const },
+  { label: 'Blog', href: '/blog', activeKey: 'blog' as const },
   { label: 'GitHub', href: 'https://github.com/Sedimie/Sedim', external: true },
 ] as const
 
@@ -322,8 +324,9 @@ export const footerColumns = [
     links: [
       { label: 'Landing', href: '/' },
       { label: 'Documentation', href: '/docs' },
+      { label: 'Guides', href: '/guides' },
+      { label: 'Reference', href: '/reference' },
       { label: 'Modules', href: '/#modules' },
-      { label: 'Groundwork', href: '/guides' },
     ],
   },
   {
@@ -338,6 +341,7 @@ export const footerColumns = [
   {
     title: 'Community',
     links: [
+      { label: 'Blog', href: '/blog' },
       { label: 'GitHub', href: 'https://github.com/Sedimie/Sedim', external: true as const },
       { label: 'Discord', href: 'https://discord.com/invite/H7yutstM', external: true as const },
       { label: 'Contributing', href: 'https://github.com/Sedimie/Sedim/blob/main/CONTRIBUTING.md', external: true as const },

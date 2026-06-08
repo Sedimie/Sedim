@@ -7,8 +7,8 @@ type BrandProps = {
 }
 
 const LOGO_SIZES = {
-  header: 56,
-  footer: 72,
+  header: 80,
+  footer: 120,
 } as const
 
 export function Brand({ size = 'header', className = '' }: BrandProps) {

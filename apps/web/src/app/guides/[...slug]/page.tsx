@@ -1,7 +1,5 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { SiteFooter } from '~/components/site-footer'
-import { SiteHeader } from '~/components/site-header'
 import { getGuide, guides } from '~/lib/content'
 
 type Props = { params: Promise<{ slug: string[] }> }
@@ -23,19 +21,15 @@ export default async function GuidePage({ params }: Props) {
   if (!guide) notFound()
 
   return (
-    <>
-      <SiteHeader />
-      <main className="content-page">
-        <div className="container prose-content" style={{ maxWidth: 720 }}>
-          <Link href="/guides" className="text-link" style={{ marginBottom: '1.5rem', display: 'inline-block' }}>
-            ← All guides
-          </Link>
-          <h1>{guide.title}</h1>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>{guide.description}</p>
-          <div className="prose-body" dangerouslySetInnerHTML={{ __html: guide.content }} />
-        </div>
-      </main>
-      <SiteFooter />
-    </>
+    <main className="content-page">
+      <div className="container prose-content" style={{ maxWidth: 720 }}>
+        <Link href="/guides" className="text-link" style={{ marginBottom: '1.5rem', display: 'inline-block' }}>
+          ← All guides
+        </Link>
+        <h1>{guide.title}</h1>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>{guide.description}</p>
+        <div className="prose-body" dangerouslySetInnerHTML={{ __html: guide.content }} />
+      </div>
+    </main>
   )
 }
