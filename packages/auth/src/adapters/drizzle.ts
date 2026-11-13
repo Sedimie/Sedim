@@ -89,13 +89,16 @@ interface DrizzleInsertBuilder {
   values(data: unknown): { returning(): Promise<unknown[]> }
 }
 interface DrizzleUpdateBuilder {
-  set(data: unknown): { where(condition: unknown): Promise<void> }
+  // Promise<unknown> (not Promise<void>) so drivers whose terminal operations resolve to
+  // a query-result object (e.g. Neon's NeonHttpQueryResult) stay assignable. The adapter
+  // discards these results.
+  set(data: unknown): { where(condition: unknown): Promise<unknown> }
 }
 interface DrizzleDeleteBuilder {
-  where(condition: unknown): Promise<void>
+  where(condition: unknown): Promise<unknown>
 }
 interface DrizzleGtBuilder {
-  where(condition: unknown): Promise<void>
+  where(condition: unknown): Promise<unknown>
 }
 
 // ── Factory ───────────────────────────────────────────────────
@@ -118,9 +121,12 @@ interface DrizzleGtBuilder {
 export function createDrizzleAdapter(
   db: DrizzleDb,
   schema: AuthDrizzleSchema,
-  eq: (col: unknown, val: unknown) => unknown,
-  and: (...conditions: unknown[]) => unknown,
-  lt: (col: unknown, val: unknown) => unknown,
+  // Typed loosely so Drizzle's real operator signatures (which take SQLWrapper, not
+  // unknown) stay assignable when passed in — strictFunctionTypes rejects the narrower
+  // `unknown`-param form. The adapter only forwards these straight back to Drizzle.
+  eq: (...args: any[]) => unknown,
+  and: (...args: any[]) => unknown,
+  lt: (...args: any[]) => unknown,
 ): DatabaseAdapter {
   return {
     // ── users ───────────────────────────────────────────────

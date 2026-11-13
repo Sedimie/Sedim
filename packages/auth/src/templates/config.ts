@@ -3,7 +3,7 @@
 // This is the only file you need to edit to wire auth to your project.
 // Everything else in src/sedim/auth/ is stamped and ready to use.
 
-import type { AuthConfig } from './adapters/framework-config.js'
+import type { AuthConfig } from './adapters/framework/framework-config.js'
 import { dbAdapter } from '../auth-adapter.js'
 {{PROVIDERS_IMPORT}}
 

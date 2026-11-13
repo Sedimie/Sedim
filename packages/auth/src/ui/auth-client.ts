@@ -111,7 +111,8 @@ export async function getSession(): Promise<AuthUser | null> {
 }
 
 export async function listSessions(): Promise<AuthResult<SessionInfo[]>> {
-  return get<{ sessions: SessionInfo[] }>('/sessions')
+  const result = await get<{ sessions: SessionInfo[] }>('/sessions')
+  return result.ok ? { ok: true, data: result.data.sessions } : result
 }
 
 export async function revokeSession(sessionId: string): Promise<AuthResult<{ ok: true }>> {

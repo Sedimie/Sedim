@@ -5,7 +5,7 @@
 //   app.use(sessionMiddleware)                    // attach user to all requests
 //   app.get('/protected', requireAuth, handler)  // protect specific routes
 
-import { createSessionMiddleware, expressRequireAuth } from './adapters/framework.js'
+import { createSessionMiddleware, expressRequireAuth } from './adapters/framework/express.js'
 import { authConfig } from './config.js'
 
 export const sessionMiddleware = createSessionMiddleware(authConfig)

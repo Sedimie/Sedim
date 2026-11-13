@@ -4,7 +4,7 @@
 //   import { authRoutes } from './sedim/auth'
 //   app.route('/auth', authRoutes)
 
-import { createHonoAuthRoutes } from './adapters/framework.js'
+import { createHonoAuthRoutes } from './adapters/framework/hono.js'
 import { authConfig } from './config.js'
 
 export const authRoutes = createHonoAuthRoutes(authConfig)

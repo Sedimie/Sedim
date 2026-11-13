@@ -13,7 +13,7 @@
 
 // ── Server exports ────────────────────────────────────────────
 export { authConfig } from './config.js'
-export { getSession } from './adapters/framework.js'
+export { getSession } from './adapters/framework/{{FRAMEWORK}}.js'
 export type { User, OtpToken, OAuthAccount, TotpCredential, BackupCode } from './adapters/types.js'
 export type { Session, SessionValidationResult } from './core/session.js'
 export { hashPassword, verifyPassword, needsRehash } from './core/hash-password.js'

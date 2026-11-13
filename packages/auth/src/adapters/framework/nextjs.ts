@@ -84,7 +84,9 @@ export async function getSession(
  *   import { getServerSession } from './auth-client'
  *   const user = await getServerSession(authConfig)
  */
-export async function getServerSession(config: AuthConfig): Promise<User | null> {
+export async function getServerSession(
+  config: AuthConfig,
+): Promise<Omit<User, 'passwordHash'> | null> {
   const resolved = resolveConfig(config)
   const token = await getSessionToken(resolved)
   const result = await validateRequest(resolved.db, token)
