@@ -4,7 +4,7 @@
 //   import { authRouter } from './sedim/auth'
 //   app.use('/auth', authRouter)
 
-import { createExpressAuthRouter } from './adapters/framework.js'
+import { createExpressAuthRouter } from './adapters/framework/express.js'
 import { authConfig } from './config.js'
 
 export const authRouter = createExpressAuthRouter(authConfig)

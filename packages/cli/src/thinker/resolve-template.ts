@@ -219,7 +219,7 @@ function buildProvidersImport(features: string[]): string {
   if (features.includes('oauth-github')) providerFns.push('githubProvider')
   if (features.includes('oauth-discord')) providerFns.push('discordProvider')
   if (providerFns.length === 0) return ''
-  return `import { ${providerFns.join(', ')} } from './adapters/framework-config.js'`
+  return `import { ${providerFns.join(', ')} } from './adapters/framework/framework-config.js'`
 }
 
 // builds the providers array for authConfig based on selected features
