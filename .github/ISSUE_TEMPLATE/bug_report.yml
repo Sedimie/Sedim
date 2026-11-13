@@ -1,0 +1,40 @@
+name: Bug report
+description: Something is broken in the CLI, a module, or the stamped output
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is a security vulnerability, do not file it here - see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran and, if relevant, the stack you ran them on.
+      placeholder: |
+        1. sedim init
+        2. sedim add auth
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: stack
+    attributes:
+      label: Stack
+      description: Framework, ORM, database, language (e.g. Next.js + Drizzle + Postgres + TS)
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: "@sedim/cli version or the commit you tested against"
+    validations:
+      required: false

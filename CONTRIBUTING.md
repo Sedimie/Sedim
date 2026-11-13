@@ -9,7 +9,18 @@ To start off, you'll need an overview of what's happening in the library, so fir
 This is a monorepo, with packages as the `core`, `cli`, `auth`, and other modules to be added in the future. 
 `core` contains the shared types between the `cli` and any `module`. The `cli` is built such that any module can seemlessly fit into it and give the same experience to the user. 
 
+---
 
+## Start here
+
+New to the project? The fastest path in:
+
+1. Skim the [README](./README.md) to see what Sedim does and why.
+2. Read the [direction RFC](https://github.com/orgs/Sedimie/discussions/25) for where we are headed - all feedback welcome.
+3. Pick a [good first issue](https://github.com/Sedimie/Sedim/labels/good%20first%20issue). The concept guides and theme issues are self-contained and repeatable, so several people can take one each.
+4. Follow Getting Started below, make your change, test it in a playground fixture, and open a PR.
+
+Every large change (a new adapter, a new module, a significant refactor) gets its own RFC discussion before implementation - open one in [Discussions](https://github.com/Sedimie/Sedim/discussions) or comment on the direction RFC.
 
 ## What can you contribute?
 
@@ -64,7 +75,7 @@ Sedim/
 │   └── core/          — shared types used by CLI and modules
 ├── apps/
 │   ├── playground/    — fixture apps for testing
-│   └── docs/          — VitePress documentation site
+│   └── web/           — documentation site (Next.js + Velite)
 └── registry/
     └── auth/latest.json  — module manifest
 ```
@@ -200,7 +211,7 @@ The CLI is in `packages/cli/src/`. You can work on:
 
 ### Improve documentation
 
-The docs live in `apps/docs/`. If you find a broken link, an unclear explanation, or a missing guide, fix it. The docs are just Markdown files - you can edit them directly.
+The docs live in `apps/web/` (Next.js + Velite, content under `apps/web/content/`). If you find a broken link, an unclear explanation, or a missing guide, fix it. The content is MDX - you can edit it directly. The understanding-first guides are tracked as good first issues.
 
 ### Improve UI / accessibility
 
