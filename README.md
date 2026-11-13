@@ -284,7 +284,7 @@ AI Agentic coding is another thing that this might clash with, but an AI tool mi
 
 ### Check out the docs
 
-Full documentation - customization guides, adapter references, module authoring, and escape hatches - is at [sedim.dev/docs](https://sedim.dev/docs).
+Full documentation - customization guides, adapter references, module authoring, and escape hatches - is at [sedim-web.vercel.app](https://sedim-web.vercel.app).
 
 ### Contributing
 
@@ -293,7 +293,7 @@ Open Source Week is live and the backlog is tiered for every level. The path in:
 1. Read the [direction RFC](https://github.com/orgs/Sedimie/discussions/25) to see where Sedim is headed, and push back on it.
 2. Pick a [good first issue](https://github.com/Sedimie/Sedim/labels/good%20first%20issue) - the concept guides and theme issues are self-contained and make a great first PR.
 3. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, architecture, and the module/adapter interface.
-4. Learn the concepts in the [docs](https://sedim.dev/docs), and say hi on [Discord](https://discord.com/invite/H7yutstM).
+4. Learn the concepts in the [docs](https://sedim-web.vercel.app), and say hi on [Discord](https://discord.com/invite/H7yutstM).
 
 To add a framework adapter, ORM adapter, or a new module, CONTRIBUTING.md documents the full pattern - adding an adapter for a supported module takes a few hours once you understand it.
 
