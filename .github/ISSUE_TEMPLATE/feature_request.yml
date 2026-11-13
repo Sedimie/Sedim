@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a new module, adapter, or capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a large change (a new module, a new framework/ORM adapter, a significant refactor), consider opening a Discussion first - big bets get an RFC before implementation.
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want
+      description: Describe the capability and the problem it solves.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: How would you approach it
+      description: Optional. A sketch of the implementation, if you have one.
+    validations:
+      required: false

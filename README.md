@@ -286,11 +286,16 @@ AI Agentic coding is another thing that this might clash with, but an AI tool mi
 
 Full documentation - customization guides, adapter references, module authoring, and escape hatches - is at [sedim.dev/docs](https://sedim.dev/docs).
 
-### Contributions
+### Contributing
 
-To add a framework adapter, ORM adapter, or new module, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+Open Source Week is live and the backlog is tiered for every level. The path in:
 
-The module spec and adapter interface are documented there - adding a new adapter for a supported module takes a few hours once you understand the pattern.
+1. Read the [direction RFC](https://github.com/orgs/Sedimie/discussions/25) to see where Sedim is headed, and push back on it.
+2. Pick a [good first issue](https://github.com/Sedimie/Sedim/labels/good%20first%20issue) - the concept guides and theme issues are self-contained and make a great first PR.
+3. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, architecture, and the module/adapter interface.
+4. Learn the concepts in the [docs](https://sedim.dev/docs), and say hi on [Discord](https://discord.com/invite/H7yutstM).
+
+To add a framework adapter, ORM adapter, or a new module, CONTRIBUTING.md documents the full pattern - adding an adapter for a supported module takes a few hours once you understand it.
 
 ### Watch the Full Walkthrough
 

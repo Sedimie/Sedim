@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Direction RFC
+    url: https://github.com/orgs/Sedimie/discussions/25
+    about: Where Sedim is headed, and where to push back on it.
+  - name: Discussions
+    url: https://github.com/Sedimie/Sedim/discussions
+    about: Questions, ideas, and RFCs for larger changes.
+  - name: Discord
+    url: https://discord.com/invite/H7yutstM
+    about: Chat with the community.
