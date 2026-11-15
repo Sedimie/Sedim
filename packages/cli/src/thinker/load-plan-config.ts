@@ -1,33 +1,81 @@
 import { createWriteStream } from 'node:fs'
 import https from 'node:https'
 import os from 'node:os'
-import { pipeline } from 'node:stream'
-import { promisify } from 'node:util'
 import type { DetectedContext, ModuleManifest, PlanConfig } from '../planning/types'
 import { DEFAULT_PACKAGES_URL } from '../shared/constants'
+import { RegistryError } from '../shared/errors.js'
 import { manifestToPlanConfig } from './manifest-to-plan-config.js'
-
-const streamPipeline = promisify(pipeline)
 
 // Downloads a remote .js file to a temp location so Node's ESM loader can import it.
 // Node's native ESM loader only supports file:// and data:// URLs — not https://.
 // By downloading to /tmp/ we get a path that import() can handle.
-async function downloadToTemp(url: string, suffix: string): Promise<string> {
+// Returns null if the file does not exist (404), or throws RegistryError on transport/rate-limit/server errors.
+export async function downloadToTemp(url: string, suffix: string): Promise<string | null> {
   const tmpDir = os.tmpdir()
   const tmpPath = `${tmpDir}/sedim-${suffix}-${Date.now()}.js`
-  await new Promise<void>((resolve, reject) => {
-    const req = https.get(url, res => {
+  return new Promise<string | null>((resolve, reject) => {
+    const req = https.get(url, { timeout: 15000 }, res => {
+      if (res.statusCode === 404) {
+        resolve(null)
+        return
+      }
+      if (res.statusCode === 429) {
+        reject(
+          new RegistryError(
+            `GitHub rate limit exceeded while downloading plan-config from ${url}`,
+            undefined,
+            'GitHub API rate limit reached. Wait a few moments or set a local registry in sedim.config.ts.',
+          ),
+        )
+        return
+      }
+      if (res.statusCode && res.statusCode >= 500) {
+        reject(
+          new RegistryError(
+            `GitHub server error (HTTP ${res.statusCode}) while downloading plan-config from ${url}`,
+            undefined,
+            'GitHub is experiencing server errors. Try again in a few minutes.',
+          ),
+        )
+        return
+      }
       if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}`))
+        reject(
+          new RegistryError(
+            `Failed to download plan-config (HTTP ${res.statusCode}) from ${url}`,
+            undefined,
+            'Check your network connection or verify that the registry URL is correct.',
+          ),
+        )
         return
       }
       const file = createWriteStream(tmpPath)
       res.pipe(file)
-      file.on('finish', () => file.close(() => resolve()))
+      file.on('finish', () => file.close(() => resolve(tmpPath)))
+      file.on('error', err => reject(err))
     })
-    req.on('error', reject)
+
+    req.on('timeout', () => {
+      req.destroy()
+      reject(
+        new RegistryError(
+          `Request timed out after 15s while downloading plan-config from ${url}`,
+          undefined,
+          'Check your internet connection or verify that the registry URL is reachable.',
+        ),
+      )
+    })
+
+    req.on('error', err => {
+      reject(
+        new RegistryError(
+          `Network error while downloading plan-config from ${url}: ${err.message}`,
+          err,
+          'Check your internet connection and verify that GitHub is reachable.',
+        ),
+      )
+    })
   })
-  return tmpPath
 }
 
 // Attempts to load a module's own plan-config.ts for richer, framework-aware planning.
@@ -65,19 +113,21 @@ export async function loadPlanConfig(
 
   // 2. try remote .js from GitHub — global/installed CLI mode
   // Node's native ESM loader can't import https:// URLs, so we download to /tmp first
-  try {
-    const fnName = `create${capitalize(moduleName)}PlanConfig`
-    const remoteUrl = `${packagesUrl}/${moduleName}/planConfig/plan-config.js`
-    const tmpPath = await downloadToTemp(remoteUrl, moduleName)
-    const mod = await import(tmpPath)
-    if (mod && typeof mod[fnName] === 'function') {
-      return (mod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(
-        ctx,
-        selectedFeatures,
-      )
+  const fnName = `create${capitalize(moduleName)}PlanConfig`
+  const remoteUrl = `${packagesUrl}/${moduleName}/planConfig/plan-config.js`
+  const tmpPath = await downloadToTemp(remoteUrl, moduleName)
+  if (tmpPath) {
+    try {
+      const mod = await import(tmpPath)
+      if (mod && typeof mod[fnName] === 'function') {
+        return (mod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(
+          ctx,
+          selectedFeatures,
+        )
+      }
+    } catch {
+      // module could not be evaluated, fall through to generic manifest fallback
     }
-  } catch {
-    // fall through
   }
 
   // 3. generic fallback — works with only a remote manifest
