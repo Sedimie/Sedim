@@ -44,13 +44,10 @@ export async function runPlan(moduleName: string): Promise<void> {
   const planSpinner = ui.createSpinner('Building plan...')
 
   // Flatten all feature categories from the manifest so plan shows the full possible plan.
-  // plan-config uses selectedFeatures to gate conditional templates (RBAC, JWT, UI, etc.)
-  const allManifestFeatures = [
-    ...(manifest.features.providers ?? []),
-    ...(manifest.features.authorization ?? []),
-    ...(manifest.features.session ?? []),
-    ...(manifest.features.ui ?? []),
-  ]
+  // Works generically for any module (auth, billing, chat, etc.) without hardcoded categories.
+  const allManifestFeatures = Object.values(manifest.features)
+    .filter((v): v is string[] => Array.isArray(v))
+    .flat()
 
   let planConfig: import('../planning/types').PlanConfig
   try {

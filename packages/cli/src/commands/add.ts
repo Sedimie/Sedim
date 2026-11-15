@@ -93,105 +93,59 @@ export async function runAdd(
   // ── feature selection ────────────────────────────────────
   ui.logSection('Configuration')
 
-  const selections: Record<string, unknown> = {}
+  const selectedFeatures: string[] = []
 
-  if (manifest.features.providers?.length) {
-    const providerLabels: Record<string, { label: string; hint: string }> = {
-      'email-password': { label: 'Email + Password', hint: 'classic credential auth' },
-      'magic-link': { label: 'Magic Link', hint: 'passwordless email login' },
-      'oauth-google': { label: 'Google OAuth', hint: 'sign in with Google' },
-      'oauth-github': { label: 'GitHub OAuth', hint: 'sign in with GitHub' },
-      'oauth-discord': { label: 'Discord OAuth', hint: 'sign in with Discord' },
-      totp: { label: 'TOTP (2FA)', hint: 'Google Authenticator, Authy' },
+  // Generic, manifest-driven feature prompts — works for any module
+  for (const [categoryKey, rawOptions] of Object.entries(manifest.features)) {
+    if (!Array.isArray(rawOptions) || rawOptions.length === 0) continue
+
+    const categoryMeta = manifest.featureMeta?.[categoryKey]
+    const prompt = categoryMeta?.prompt ?? `Which ${formatCategoryName(categoryKey)}?`
+    const type = categoryMeta?.type ?? (rawOptions.length > 3 ? 'multiselect' : 'select')
+
+    const options = rawOptions.map(opt => {
+      const optMeta = categoryMeta?.options?.[opt]
+      return {
+        value: opt,
+        label: optMeta?.label ?? formatOptionLabel(opt),
+        hint: optMeta?.hint,
+      }
+    })
+
+    if (type === 'multiselect') {
+      const chosen = await ui.multiselect(prompt, options)
+      selectedFeatures.push(...((chosen as string[]) ?? []))
+    } else {
+      const selectOptions = categoryMeta?.allowNone
+        ? [
+            {
+              value: 'none',
+              label: 'None',
+              hint: `skip ${formatCategoryName(categoryKey)}`,
+            },
+            ...options,
+          ]
+        : options
+
+      const chosen = await ui.select(prompt, selectOptions)
+      if (chosen && chosen !== 'none') {
+        selectedFeatures.push(chosen as string)
+      }
+
+      // If user chose themed UI, prompt for theme variant from manifest layers
+      if (categoryKey === 'ui' && chosen === 'themed' && manifest.layers.ui?.themes?.length) {
+        const themeOptions = manifest.layers.ui.themes.map(t => ({
+          value: t,
+          label: formatOptionLabel(t),
+          hint: getThemeHint(t),
+        }))
+        const chosenTheme = await ui.select('Which theme variant?', themeOptions)
+        if (chosenTheme) {
+          selectedFeatures.push(chosenTheme as string)
+        }
+      }
     }
-    selections.providers = await ui.multiselect(
-      'Which auth providers?',
-      manifest.features.providers.map(p => ({
-        value: p,
-        label: providerLabels[p]?.label ?? p,
-        hint: providerLabels[p]?.hint,
-      })),
-    )
   }
-
-  // UI style — available for all backends (Next.js directly, Express/Hono via React companion)
-  // The plan config handles where UI actually stamps based on framework detection
-  if (manifest.features.ui?.length) {
-    const uiLabels: Record<string, { label: string; hint: string }> = {
-      headless: { label: 'Headless', hint: 'unstyled, full control — works with any frontend' },
-      tailwind: { label: 'Tailwind', hint: 'pre-styled with Tailwind CSS' },
-      themed: { label: 'Themed', hint: 'pre-built theme variants' },
-    }
-    const uiHint =
-      ctx.framework.value !== 'nextjs'
-        ? ' (requires Next.js OR a React app alongside Express/Hono)'
-        : ''
-    selections.ui = await ui.select(
-      `UI style for auth components${uiHint}?`,
-      manifest.features.ui.map(u => ({
-        value: u,
-        label: uiLabels[u]?.label ?? u,
-        hint: uiLabels[u]?.hint,
-      })),
-    )
-
-    if (selections.ui === 'themed') {
-      selections.themeVariant = await ui.select('Which theme variant?', [
-        { value: 'modern', label: 'Modern', hint: 'Glassmorphism & Gradients' },
-        { value: 'minimal', label: 'Minimal', hint: 'Neumorphism & Soft UI' },
-        { value: 'colorful', label: 'Colorful', hint: 'Neubrutalism' },
-      ])
-    }
-  }
-
-  if (manifest.features.authorization?.length) {
-    selections.authorization = await ui.select('Authorization model?', [
-      { value: 'none', label: 'None', hint: 'skip authorization — add it later' },
-      ...manifest.features.authorization.map(a => ({
-        value: a,
-        label: a.toUpperCase(),
-        hint: a === 'rbac' ? 'role-based access control' : 'attribute-based access control',
-      })),
-    ])
-  }
-
-  if (manifest.features.session?.length) {
-    const sessionLabels: Record<string, { label: string; hint: string }> = {
-      'session-cookie': {
-        label: 'Session cookies (recommended)',
-        hint: 'DB-backed sessions, full revocation',
-      },
-      jwt: { label: 'JWT (stateless API)', hint: 'short-lived access tokens, refresh rotation' },
-    }
-    selections.session = await ui.select('Session transport?', [
-      {
-        value: 'session-cookie',
-        label: 'Session cookies (recommended)',
-        hint: 'DB-backed sessions, full revocation',
-      },
-      {
-        value: 'jwt',
-        label: 'JWT (stateless API)',
-        hint: 'short-lived access tokens, refresh rotation',
-      },
-    ])
-  }
-
-  // ── build plan ───────────────────────────────────────────
-  ui.logSection('Planning')
-  const planSpinner = ui.createSpinner('Building install plan...')
-
-  // selectedFeatures is the flat list of what the user picked
-  // 'none' for authorization means skip it — don't add to selectedFeatures
-  const selectedFeatures = [
-    ...((selections.providers as string[]) ?? []),
-    ...((selections.ui as string[]) ? [selections.ui as string] : []),
-    ...((selections.themeVariant as string[]) ? [selections.themeVariant as string] : []),
-    ...((selections.authorization as string[]) && selections.authorization !== 'none'
-      ? [selections.authorization as string]
-      : []),
-    ...((selections.session as string[]) ? [selections.session as string] : []),
-  ]
 
   // load plan config — uses module's own plan-config.ts if available,
   // falls back to generic manifest conversion
@@ -384,4 +338,23 @@ export async function runAdd(
 
   ui.showEndReport(plan, Date.now() - start)
   ui.showOutro(`${moduleName} installed.`)
+}
+
+function formatCategoryName(key: string): string {
+  return key.replace(/[-_]/g, ' ')
+}
+
+function formatOptionLabel(val: string): string {
+  if (val.length <= 4 && val.toUpperCase() === val) return val
+  return val
+    .split(/[-_]/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
+function getThemeHint(theme: string): string {
+  if (theme === 'modern') return 'Glassmorphism & Gradients'
+  if (theme === 'minimal') return 'Neumorphism & Soft UI'
+  if (theme === 'colorful') return 'Neubrutalism'
+  return ''
 }

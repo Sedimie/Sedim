@@ -11,6 +11,8 @@ export type {
   Detected,
   DetectedContext,
   EnvVarConfig,
+  FeatureCategoryMeta,
+  FeatureOptionMeta,
   FileOperation,
   FileToCreate,
   FileToModify,
