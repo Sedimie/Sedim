@@ -29,7 +29,7 @@
     "ui": {
       "headless": true,
       "tailwind": true,
-      "themes": ["minimal", "enterprise"]
+      "themes": ["modern", "minimal", "colorful"]
     }
   },
   "features": {
