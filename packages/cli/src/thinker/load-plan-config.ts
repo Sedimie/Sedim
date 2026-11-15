@@ -8,6 +8,7 @@ import { DEFAULT_PACKAGES_URL } from '../shared/constants'
 import { manifestToPlanConfig } from './manifest-to-plan-config.js'
 
 const streamPipeline = promisify(pipeline)
+const DOWNLOAD_TIMEOUT_MS = 15000 // 15 seconds
 
 // Downloads a remote .js file to a temp location so Node's ESM loader can import it.
 // Node's native ESM loader only supports file:// and data:// URLs — not https://.
@@ -24,6 +25,12 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
       const file = createWriteStream(tmpPath)
       res.pipe(file)
       file.on('finish', () => file.close(() => resolve()))
+      file.on('error', reject)
+    })
+    req.setTimeout(DOWNLOAD_TIMEOUT_MS, () => {
+      req.destroy(
+        new Error(`Download timed out after ${DOWNLOAD_TIMEOUT_MS / 1000}s while fetching ${url}`),
+      )
     })
     req.on('error', reject)
   })
