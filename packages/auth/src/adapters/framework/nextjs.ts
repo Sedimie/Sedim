@@ -2,7 +2,6 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { hashSessionToken } from '../../core/generate-token.js'
-import { createRefreshToken } from '../../core/jwt.js'
 import { encodeBase32LowerCaseNoPadding } from '@oslojs/encoding'
 
 function generateCsrfToken(): string {
