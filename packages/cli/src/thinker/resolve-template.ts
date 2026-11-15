@@ -116,11 +116,17 @@ async function tryFetch(url: string): Promise<string | null> {
 
 // ── Substitution variables ────────────────────────────────────
 
-// Strips .js extensions from relative imports so bundlers (Next.js Turbopack,
-// Vite, webpack) can resolve them. Only touches imports starting with ./ or ../
-// to avoid breaking third-party package imports like 'drizzle-orm/neon-http'.
-function stripRelativeJsExtensions(content: string): string {
-  return content.replace(/(from\s+['"])(\.\.?\/[^'"]*?)\.js(['"])/g, '$1$2$3')
+// Strips .js extensions from relative imports (static and dynamic) so bundlers
+// (Next.js Turbopack, Vite, webpack) can resolve them. Only touches imports starting
+// with ./ or ../ to avoid breaking third-party package imports like 'drizzle-orm/neon-http'.
+export function stripRelativeJsExtensions(content: string): string {
+  // Static imports and re-exports: from './...' or from '../...'
+  let result = content.replace(/(from\s+['"])(\.\.?\/[^'"]*?)\.js(['"])/g, '$1$2$3')
+  // Dynamic imports: import('./...') or import('../...')
+  result = result.replace(/(import\s*\(\s*['"])(\.\.?\/[^'"]*?)\.js(['"]\s*\))/g, '$1$2$3')
+  // Side-effect imports: import './...' or import '../...'
+  result = result.replace(/(import\s+['"])(\.\.?\/[^'"]*?)\.js(['"])/g, '$1$2$3')
+  return result
 }
 
 function applySubstitutions(
