@@ -151,6 +151,8 @@ function applySubstitutions(
     COOKIE_NAME: 'auth_session',
     // conditional UI component exports for the barrel index
     UI_EXPORTS: buildUiExports(selectedFeatures),
+    // conditional framework entrypoint exports for the barrel index (Express/Hono)
+    FRAMEWORK_EXPORTS: buildFrameworkExports(ctx.framework.value),
     // page content — generated based on selected features
     LOGIN_PAGE: buildLoginPage(selectedFeatures),
     SIGNUP_PAGE: buildSignupPage(selectedFeatures),
@@ -214,6 +216,20 @@ function buildUiExports(features: string[]): string {
     lines.push(`export { TotpVerifyForm } from './ui/TotpVerifyForm.js'`)
   }
   return lines.length > 0 ? lines.join('\n') : ''
+}
+
+// builds framework-specific route/middleware exports for the barrel index (index.ts)
+function buildFrameworkExports(framework: string): string {
+  if (framework === 'express') {
+    return [
+      `export { authRouter } from './router.js'`,
+      `export { sessionMiddleware, requireAuth } from './middleware.js'`,
+    ].join('\n')
+  }
+  if (framework === 'hono') {
+    return `export { authRoutes } from './routes.js'`
+  }
+  return ''
 }
 
 // builds the provider import line for config.ts based on selected features
