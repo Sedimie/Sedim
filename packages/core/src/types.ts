@@ -172,11 +172,23 @@ export interface ModuleManifestLayers {
   ui: { headless: boolean; tailwind: boolean; themes: string[] }
 }
 
+export interface FeatureOptionMeta {
+  label: string
+  hint?: string
+}
+
+export interface FeatureCategoryMeta {
+  prompt?: string
+  type?: 'select' | 'multiselect'
+  allowNone?: boolean
+  options?: Record<string, FeatureOptionMeta>
+}
+
 export interface ModuleManifest {
   name: string
   version: string
   layers: ModuleManifestLayers
-  features: {
+  features: Record<string, string[] | undefined> & {
     providers?: string[]
     authorization?: string[]
     ui?: UILevel[]
@@ -186,6 +198,8 @@ export interface ModuleManifest {
     envVars: string[]
     peerModules: string[]
   }
+  /** Per-feature metadata — used by the CLI to dynamically render prompts, types, and hints */
+  featureMeta?: Record<string, FeatureCategoryMeta>
   /** Per-env-var metadata — used by the CLI to show descriptions and filter by selected features */
   envVarMeta?: Record<string, {
     description: string
