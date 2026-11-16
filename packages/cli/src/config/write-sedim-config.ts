@@ -64,11 +64,29 @@ async function writeConfigTs(projectRoot: string, config: SedimConfig): Promise<
   sf.addStatements(`// Edit this file to override detection results or set preferences.`)
   sf.addStatements(`// Re-run \`sedim init\` to regenerate from scratch.\n`)
 
-  // import
-  sf.addImportDeclaration({
-    isTypeOnly: true,
-    namedImports: ['SedimConfig'],
-    moduleSpecifier: '@sedim/cli',
+  // Inlined type definition so global CLI installs don't require @sedim/cli as a local dependency
+  sf.addTypeAlias({
+    isExported: true,
+    name: 'SedimConfig',
+    type: `{
+  framework: 'nextjs' | 'express' | 'hono' | 'fastify' | 'unknown'
+  orm: 'drizzle' | 'prisma' | 'none' | 'unknown'
+  db: 'postgres' | 'mysql' | 'sqlite' | 'mongodb' | 'unknown'
+  language: 'typescript' | 'javascript'
+  moduleSystem: 'esm' | 'cjs' | 'unknown'
+  sourceStructure: {
+    srcDir: string | null
+    apiDir: string | null
+    routeEntrypoints: string[]
+  }
+  preferences?: {
+    ui?: 'none' | 'headless' | 'tailwind' | 'themed'
+    confirmBeforeWrite?: boolean
+    dryRunByDefault?: boolean
+  }
+  overrides?: Record<string, unknown>
+  generatedAt?: string
+}`,
   })
 
   sf.addStatements('\n')
