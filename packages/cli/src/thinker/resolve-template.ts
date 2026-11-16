@@ -5,6 +5,24 @@ import { DEFAULT_PACKAGES_URL } from '../shared/constants'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// ── In-run Template and URL Caches ────────────────────────────
+// urlCache memoizes raw HTTP fetch requests by URL to prevent duplicate round-trips
+// and handles concurrent deduplication via in-flight promises.
+const urlCache = new Map<string, Promise<string | null>>()
+
+// rawTemplateCache memoizes fetched raw template content before substitutions
+// are applied, keyed by package registry URL, module name, and relative path.
+const rawTemplateCache = new Map<string, Promise<string>>()
+
+/**
+ * Clears all in-memory template and URL caches.
+ * Useful for test isolation and cache lifecycle management across runs.
+ */
+export function clearTemplateCache(): void {
+  urlCache.clear()
+  rawTemplateCache.clear()
+}
+
 // ── Template resolution ───────────────────────────────────────
 // Fetches template content from the remote GitHub registry.
 //
@@ -42,58 +60,8 @@ export async function resolveTemplate(
     return generatedKeys[relPath](selectedFeatures, ctx)
   }
 
-  let content: string
-
-  // Remote fetch (GitHub raw content)
-  // Try verbatim source first (the files exist at packages/<module>/src/<path>),
-  // then fall back to templates/ dir for UI-only content.
-  // Note: relPath may already contain an extension (e.g. "ui/themed/colorful-tokens.css")
-  // so we always try as-is first before appending any extension.
-  let found = false
-
-  // Try as-is (for files that already have their extension in the templateKey)
-  const asIsUrl = `${packagesUrl}/${moduleName}/src/${relPath}`
-  const asIsFetched = await tryFetch(asIsUrl)
-  if (asIsFetched !== null) {
-    content = asIsFetched
-    found = true
-  } else {
-    // Try with each extension appended (for files without extension in templateKey)
-    for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
-      const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
-      const raw = await tryFetch(url)
-      if (raw !== null) {
-        content = raw
-        found = true
-        break
-      }
-    }
-  }
-
-  if (!found) {
-    // Try templates/ dir as fallback (for UI pages that live under templates/)
-    // Try as-is first for files with existing extensions, then with .ts appended
-    const templateAsIs = `${packagesUrl}/${moduleName}/src/templates/${relPath}`
-    const fetchedAsIs = await tryFetch(templateAsIs)
-    if (fetchedAsIs !== null) {
-      content = fetchedAsIs
-      found = true
-    } else {
-      const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
-      const fetched = await tryFetch(templateUrl)
-      if (fetched !== null) {
-        content = fetched
-        found = true
-      }
-    }
-  }
-
-  if (!found) {
-    throw new Error(
-      `Template not found for key "${templateKey}". ` +
-        `Checked:\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]\n  ${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`,
-    )
-  }
+  // Remote fetch with concurrent candidate resolution and in-run caching
+  let content = await fetchRawTemplate(packagesUrl, moduleName, relPath, templateKey)
 
   // Apply substitutions and strip .js extensions
   content = applySubstitutions(content, ctx, selectedFeatures)
@@ -104,14 +72,86 @@ export async function resolveTemplate(
   return content
 }
 
-async function tryFetch(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return res.text()
-  } catch {
-    return null
+async function fetchRawTemplate(
+  packagesUrl: string,
+  moduleName: string,
+  relPath: string,
+  templateKey: string,
+): Promise<string> {
+  const cacheKey = `${packagesUrl}/${moduleName}/${relPath}`
+  const cached = rawTemplateCache.get(cacheKey)
+  if (cached !== undefined) {
+    return cached
   }
+
+  const promise = (async () => {
+    const hasExtension = /\.[a-zA-Z0-9]+$/.test(relPath)
+
+    if (hasExtension) {
+      // For paths that already declare an extension (e.g. "ui/themed/colorful-tokens.css"),
+      // check the direct path under src/ and the fallback under templates/ concurrently.
+      const candidateUrls = [
+        `${packagesUrl}/${moduleName}/src/${relPath}`,
+        `${packagesUrl}/${moduleName}/src/templates/${relPath}`,
+      ]
+      const results = await Promise.all(candidateUrls.map(u => tryFetch(u)))
+      for (const res of results) {
+        if (res !== null) return res
+      }
+    } else {
+      // 1. Concurrently probe candidate extensions under src/ in priority order
+      const primaryCandidates = [
+        `${packagesUrl}/${moduleName}/src/${relPath}.ts`,
+        `${packagesUrl}/${moduleName}/src/${relPath}.tsx`,
+        `${packagesUrl}/${moduleName}/src/${relPath}.css`,
+        `${packagesUrl}/${moduleName}/src/${relPath}.prisma`,
+      ]
+      const primaryResults = await Promise.all(primaryCandidates.map(u => tryFetch(u)))
+      for (const res of primaryResults) {
+        if (res !== null) return res
+      }
+
+      // 2. If not found in primary src/, probe templates/ directory and as-is fallbacks concurrently
+      const fallbackCandidates = [
+        `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`,
+        `${packagesUrl}/${moduleName}/src/templates/${relPath}.tsx`,
+        `${packagesUrl}/${moduleName}/src/templates/${relPath}`,
+        `${packagesUrl}/${moduleName}/src/${relPath}`,
+      ]
+      const fallbackResults = await Promise.all(fallbackCandidates.map(u => tryFetch(u)))
+      for (const res of fallbackResults) {
+        if (res !== null) return res
+      }
+    }
+
+    throw new Error(
+      `Template not found for key "${templateKey}". ` +
+        `Checked:\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]\n  ${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`,
+    )
+  })()
+
+  rawTemplateCache.set(cacheKey, promise)
+  return promise
+}
+
+export async function tryFetch(url: string): Promise<string | null> {
+  const cached = urlCache.get(url)
+  if (cached !== undefined) {
+    return cached
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) return null
+      return await res.text()
+    } catch {
+      return null
+    }
+  })()
+
+  urlCache.set(url, promise)
+  return promise
 }
 
 // ── Substitution variables ────────────────────────────────────
