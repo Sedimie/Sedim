@@ -1,7 +1,6 @@
 // Express types are type-only imports — express lives in the user's project.
 import type { Request, Response, NextFunction, Router, RequestHandler } from 'express'
 import { hashSessionToken } from '../../core/generate-token.js'
-import { createRefreshToken } from '../../core/jwt.js'
 import type { User } from '../types.js'
 import type { Session } from '../../core/session.js'
 import type { AuthConfig } from './framework-config.js'

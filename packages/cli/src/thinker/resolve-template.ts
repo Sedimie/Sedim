@@ -37,6 +37,8 @@ export async function resolveTemplate(
     'ui/pages/forgot-password-page': f => buildForgotPage(f),
     'ui/pages/reset-password-page': f => buildResetPage(f),
     'db/client': (_f, c) => buildDbClientFile(c),
+    'adapters/framework/operations': f => buildOperationsFile(f),
+    'templates/operations': f => buildOperationsFile(f),
   }
   if (generatedKeys[relPath]) {
     return generatedKeys[relPath](selectedFeatures, ctx)
@@ -158,6 +160,11 @@ function applySubstitutions(
     RESET_PAGE: buildResetPage(selectedFeatures),
     // API base path — /api/auth for Next.js, /auth for Express/Hono
     API_BASE_PATH: buildApiBasePath(ctx),
+    // modular operations wiring
+    OPERATIONS_OAUTH: buildOperationsOAuth(selectedFeatures),
+    OPERATIONS_TOTP: buildOperationsTotp(selectedFeatures),
+    OPERATIONS_JWT: buildOperationsJwt(selectedFeatures),
+    OPERATIONS_GUARDS: buildOperationsGuards(selectedFeatures),
   }
 
   return content.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`)
@@ -246,6 +253,124 @@ function buildProvidersConfig(features: string[]): string {
   }
   if (lines.length === 0) return ''
   return `  providers: [\n${lines.join('\n')}\n  ],`
+}
+
+function buildOperationsOAuth(features: string[]): string {
+  const hasOAuth = features.some(f => f.startsWith('oauth-'))
+  if (hasOAuth) {
+    return `export { createOAuthRedirect, handleOAuthCallback } from './operations/oauth.js'`
+  }
+  return [
+    `export function createOAuthRedirect(`,
+    `  _config: ResolvedAuthConfig,`,
+    `  _providerId: string,`,
+    `): AuthResult<{ url: URL; codeVerifier: string; state: string }> {`,
+    `  return { ok: false, error: 'oauth-provider-unknown' }`,
+    `}`,
+    ``,
+    `export async function handleOAuthCallback(`,
+    `  _db: DatabaseAdapter,`,
+    `  _config: ResolvedAuthConfig,`,
+    `  _providerId: string,`,
+    `  _code: string,`,
+    `  _codeVerifier: string,`,
+    `): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+    `  return { ok: false, error: 'oauth-provider-unknown' }`,
+    `}`,
+  ].join('\n')
+}
+
+function buildOperationsTotp(features: string[]): string {
+  const hasTotp = features.includes('totp')
+  if (hasTotp) {
+    return `export { setupTotp, getTotpUri, completeTotpLogin, verifyBackupCode } from './operations/totp.js'`
+  }
+  return [
+    `export async function setupTotp(`,
+    `  _db: DatabaseAdapter,`,
+    `  _userId: string,`,
+    `  _secret: string,`,
+    `  _authSecret: string,`,
+    `): Promise<{ encryptedSecret: string; backupCodes: string[] }> {`,
+    `  return { encryptedSecret: '', backupCodes: [] }`,
+    `}`,
+    ``,
+    `export async function getTotpUri(`,
+    `  _db: DatabaseAdapter,`,
+    `  _userId: string,`,
+    `  _email: string,`,
+    `  _authSecret: string,`,
+    `): Promise<string | null> {`,
+    `  return null`,
+    `}`,
+    ``,
+    `export async function completeTotpLogin(`,
+    `  _db: DatabaseAdapter,`,
+    `  _authSecret: string,`,
+    `  _userId: string,`,
+    `  _code: string,`,
+    `  _ip?: string,`,
+    `): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+    `  return { ok: false, error: 'totp-not-enabled' }`,
+    `}`,
+    ``,
+    `export async function verifyBackupCode(`,
+    `  _db: DatabaseAdapter,`,
+    `  _userId: string,`,
+    `  _rawCode: string,`,
+    `): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+    `  return { ok: false, error: 'backup-code-invalid' }`,
+    `}`,
+  ].join('\n')
+}
+
+function buildOperationsJwt(features: string[]): string {
+  const hasJwt = features.includes('jwt')
+  if (hasJwt) {
+    return `export { refreshAccessToken, revokeRefreshToken } from './operations/jwt.js'`
+  }
+  return [
+    `export async function refreshAccessToken(`,
+    `  _db: DatabaseAdapter,`,
+    `  _rawRefreshToken: string,`,
+    `  _authSecret: string,`,
+    `): Promise<AuthResult<{ accessToken: string; expiresAt: Date }>> {`,
+    `  return { ok: false, error: 'token-invalid' }`,
+    `}`,
+    ``,
+    `export async function revokeRefreshToken(`,
+    `  _db: DatabaseAdapter,`,
+    `  _rawRefreshToken: string,`,
+    `): Promise<void> {}`,
+  ].join('\n')
+}
+
+function buildOperationsGuards(features: string[]): string {
+  const hasGuards = features.includes('rbac') || features.includes('abac')
+  if (hasGuards) {
+    return `export { requirePermission, requireAbac } from './operations/guards.js'`
+  }
+  return ''
+}
+
+function buildOperationsFile(features: string[]): string {
+  const parts = [
+    `import type { DatabaseAdapter, User } from '../types.js'`,
+    `import type { Session } from '../../core/session.js'`,
+    `import type { ResolvedAuthConfig } from './framework-config.js'`,
+    `import type { AuthResult } from './operations/core.js'`,
+    ``,
+    `export * from './operations/core.js'`,
+    ``,
+    buildOperationsOAuth(features),
+    ``,
+    buildOperationsTotp(features),
+    ``,
+    buildOperationsJwt(features),
+    ``,
+    buildOperationsGuards(features),
+  ]
+  return stripRelativeJsExtensions(parts.filter(Boolean).join('\n'))
 }
 
 // ── Page builders ─────────────────────────────────────────────
