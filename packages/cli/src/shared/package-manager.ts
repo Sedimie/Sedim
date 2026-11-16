@@ -40,9 +40,27 @@ export async function installDependencies(
     yarn: [],
   }
 
+  const INSTALL_TIMEOUT_MS = 120000 // 2 minutes
+
   try {
-    await execa(pm, [...args, ...extraFlags[pm]], { cwd: projectRoot, stdio: 'inherit' })
-  } catch (err) {
-    throw new WriteError(`Failed to install packages: ${packages.join(', ')}`, err)
+    await execa(pm, [...args, ...extraFlags[pm]], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+      timeout: INSTALL_TIMEOUT_MS,
+    })
+  } catch (err: unknown) {
+    const error = err as { timedOut?: boolean }
+    if (error?.timedOut) {
+      throw new WriteError(
+        `Package installation timed out after ${INSTALL_TIMEOUT_MS / 1000}s while running: ${pm} ${args.join(' ')}`,
+        err,
+        `Check your network connection or npm registry status, or install manually: ${pm} ${args.join(' ')}`,
+      )
+    }
+    throw new WriteError(
+      `Failed to install packages: ${packages.join(', ')}`,
+      err,
+      `Try installing the packages manually: ${pm} ${args.join(' ')}`,
+    )
   }
 }
