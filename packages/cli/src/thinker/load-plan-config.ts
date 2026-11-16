@@ -1,6 +1,7 @@
 import { createWriteStream } from 'node:fs'
 import https from 'node:https'
 import os from 'node:os'
+import path from 'node:path'
 import { pipeline } from 'node:stream'
 import { promisify } from 'node:util'
 import type { DetectedContext, ModuleManifest, PlanConfig } from '../planning/types'
@@ -49,9 +50,30 @@ export async function loadPlanConfig(
   selectedFeatures: string[],
   packagesUrl = DEFAULT_PACKAGES_URL,
 ): Promise<PlanConfig> {
-  // 1. try workspace package import — monorepo dev mode
+  const fnName = `create${capitalize(moduleName)}PlanConfig`
+
+  // 1a. try SEDIM_LOCAL_PATH override
+  if (process.env['SEDIM_LOCAL_PATH']) {
+    try {
+      const localPlanJs = path.resolve(
+        process.env['SEDIM_LOCAL_PATH'],
+        moduleName,
+        'planConfig/plan-config.js',
+      )
+      const mod = await import(localPlanJs)
+      if (mod && typeof mod[fnName] === 'function') {
+        return (mod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(
+          ctx,
+          selectedFeatures,
+        )
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  // 1b. try workspace package import — monorepo dev mode
   try {
-    const fnName = `create${capitalize(moduleName)}PlanConfig`
     const mod = await import(`@sedim/${moduleName}/plan-config`)
     if (mod && typeof mod[fnName] === 'function') {
       return (mod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(

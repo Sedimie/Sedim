@@ -269,6 +269,24 @@ rm -rf apps/playground/<fixture-name>/src/sedim/
 
 Do not push any code changes that you do in the playground except setting up a new fixture. It's only for proof of work and testing integration locally instead of having to do npm link each time changes are made.
 
+### Local Template Development & Testing Workflow
+
+Sedim supports local-first template resolution so contributors and module authors can test changes locally without pushing to remote:
+
+1. **Automatic monorepo detection**: When the CLI is run inside the Sedim repository, `resolveTemplate` automatically detects the local `packages/<module>/src/` directory and reads templates directly from disk.
+2. **Environment variable override (`SEDIM_LOCAL_PATH`)**: To force local resolution from anywhere, set `SEDIM_LOCAL_PATH` pointing to the `packages` directory:
+   ```bash
+   SEDIM_LOCAL_PATH=/path/to/Sedim/packages sedim add auth
+   ```
+3. **Development loop**:
+   - Edit source or template files in `packages/<module>/src/`.
+   - Test against a playground fixture:
+     ```bash
+     pnpm --filter @sedim/cli exec tsx src/index.ts add auth --cwd apps/playground/nextjs-drizzle-ts
+     ```
+   - Inspect the stamped output in `apps/playground/<fixture-name>/src/sedim/` immediately.
+   - If a template does not exist locally, the CLI falls back to the remote GitHub registry.
+
 ---
 
 ## Testing
