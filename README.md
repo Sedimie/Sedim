@@ -176,7 +176,7 @@ Three levels so you use your own design system or ship immediately.
 
 **Tailwind** - fully styled with Tailwind classes, works with your existing Tailwind config.
 
-**Themed** - pre-built themes with CSS tokens. Currently ships `minimal` and `glass`.
+**Themed** - pre-built themes with CSS tokens. Ships `modern` (glassmorphic), `minimal` (neumorphic), and `colorful` (neubrutalist).
 
 ### Environment Variables
 
