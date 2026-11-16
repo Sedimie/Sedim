@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DetectedContext } from '../planning/types'
 import { DEFAULT_PACKAGES_URL } from '../shared/constants'
+import { RegistryError } from '../shared/errors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -104,14 +105,47 @@ export async function resolveTemplate(
   return content
 }
 
-async function tryFetch(url: string): Promise<string | null> {
+export async function tryFetch(url: string): Promise<string | null> {
+  let res: Response
   try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return res.text()
-  } catch {
+    res = await fetch(url)
+  } catch (err) {
+    throw new RegistryError(
+      `Network error while fetching template from ${url}: ${err instanceof Error ? err.message : String(err)}`,
+      err,
+      'Check your internet connection and verify that GitHub is reachable.',
+    )
+  }
+
+  if (res.status === 404) {
     return null
   }
+
+  if (res.status === 429) {
+    throw new RegistryError(
+      `GitHub rate limit exceeded while fetching template from ${url}`,
+      undefined,
+      'GitHub API rate limit reached. Wait a few moments or set a local registry in sedim.config.ts.',
+    )
+  }
+
+  if (res.status >= 500) {
+    throw new RegistryError(
+      `GitHub server error (HTTP ${res.status}) while fetching template from ${url}`,
+      undefined,
+      'GitHub is experiencing server errors. Try again in a few minutes or check status.github.com.',
+    )
+  }
+
+  if (!res.ok) {
+    throw new RegistryError(
+      `Failed to fetch template from ${url} (HTTP ${res.status})`,
+      undefined,
+      'Check your network connection or verify that the registry URL is correct.',
+    )
+  }
+
+  return await res.text()
 }
 
 // ── Substitution variables ────────────────────────────────────
