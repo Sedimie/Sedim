@@ -8,6 +8,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:stamping": "vitest run packages/cli/tests/stamping",
     "prepare": "husky"
   },
   "lint-staged": {
