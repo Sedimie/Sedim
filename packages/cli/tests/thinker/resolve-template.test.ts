@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { stripRelativeJsExtensions } from '../../src/thinker/resolve-template'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  clearTemplateCache,
+  getTemplateCacheSize,
+  resolveTemplate,
+  resolveTemplates,
+  stripRelativeJsExtensions,
+  tryFetch,
+} from '../../src/thinker/resolve-template'
+import type { DetectedContext } from '../../src/planning/types'
 
 describe('stripRelativeJsExtensions', () => {
   it('strips .js from static imports and re-exports', () => {
@@ -128,5 +136,111 @@ export async function run() {
 export * from './barrel'
 `
     expect(stripRelativeJsExtensions(input)).toBe(expected)
+  })
+})
+
+describe('templateFetchCache & concurrent resolution (fixes #9)', () => {
+  beforeEach(() => {
+    clearTemplateCache()
+    vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    clearTemplateCache()
+    vi.restoreAllMocks()
+  })
+
+  function makeMockCtx(): DetectedContext {
+    return {
+      framework: { value: 'nextjs', confidence: 1, signals: [] },
+      orm: { value: 'drizzle', confidence: 1, signals: [] },
+      db: { value: 'pg', confidence: 1, signals: [] },
+      language: { value: 'typescript', confidence: 1, signals: [] },
+      moduleSystem: { value: 'esm', confidence: 1, signals: [] },
+      structure: { srcDir: 'src', apiDir: 'src/app/api', routeEntrypoints: [] },
+      codeArchitecture: {
+        pattern: 'app-router',
+        apiDir: 'src/app/api',
+        componentsDir: 'src/components',
+        appEntrypoint: null,
+      },
+      hasSrcDir: true,
+      hasTailwind: true,
+      existingAuth: null,
+      frontend: null,
+    }
+  }
+
+  it('in-run cache eliminates duplicate network round-trips for the same URL', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: string | URL | Request) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('auth/src/core/session.ts')) {
+        return new Response('export const session = 1', { status: 200 })
+      }
+      return new Response('Not found', { status: 404 })
+    })
+
+    const targetUrl = 'https://raw.github.com/mock/auth/src/core/session.ts'
+    const res1 = await tryFetch(targetUrl)
+    const res2 = await tryFetch(targetUrl)
+    const res3 = await tryFetch(targetUrl)
+
+    expect(res1).toBe('export const session = 1')
+    expect(res2).toBe('export const session = 1')
+    expect(res3).toBe('export const session = 1')
+
+    // Fetch should only be invoked once for the identical URL
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(getTemplateCacheSize()).toBe(1)
+
+    // Clear cache resets the in-run memoization
+    clearTemplateCache()
+    expect(getTemplateCacheSize()).toBe(0)
+  })
+
+  it('concurrently probes candidate URLs preserving precedence order', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: string | URL | Request) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('src/core/hash.ts')) {
+        return new Response('export const hash = "primary"', { status: 200 })
+      }
+      if (urlStr.endsWith('src/templates/core/hash.ts')) {
+        return new Response('export const hash = "template-fallback"', { status: 200 })
+      }
+      return new Response('Not found', { status: 404 })
+    })
+
+    const ctx = makeMockCtx()
+    const content = await resolveTemplate('auth/core/hash', ctx, [])
+    expect(content).toContain('export const hash = "primary"')
+  })
+
+  it('falls back to templates/ directory when source path is 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: string | URL | Request) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('src/templates/ui/button.ts')) {
+        return new Response('export const Button = () => null', { status: 200 })
+      }
+      return new Response('Not found', { status: 404 })
+    })
+
+    const ctx = makeMockCtx()
+    const content = await resolveTemplate('auth/ui/button', ctx, [])
+    expect(content).toContain('export const Button = () => null')
+  })
+
+  it('resolveTemplates concurrently resolves multiple template keys', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: string | URL | Request) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('src/core/one.ts')) return new Response('export const one = 1', { status: 200 })
+      if (urlStr.endsWith('src/core/two.ts')) return new Response('export const two = 2', { status: 200 })
+      return new Response('Not found', { status: 404 })
+    })
+
+    const ctx = makeMockCtx()
+    const results = await resolveTemplates(['auth/core/one', 'auth/core/two'], ctx, [])
+
+    expect(results.get('auth/core/one')).toContain('export const one = 1')
+    expect(results.get('auth/core/two')).toContain('export const two = 2')
   })
 })
