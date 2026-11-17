@@ -74,6 +74,7 @@ export function requireAuth(_req: Request, res: Response, next: NextFunction): v
   if (!res.locals['authUser']) { res.status(401).json({ error: 'Unauthorized' }); return }
   next()
 }
+export { requireAuth as expressRequireAuth }
 
 /**
  * Creates an Express Router with all auth routes.

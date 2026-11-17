@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { stripRelativeJsExtensions } from '../../src/thinker/resolve-template'
+import {
+  buildFrameworkExports,
+  stripRelativeJsExtensions,
+} from '../../src/thinker/resolve-template'
 
 describe('stripRelativeJsExtensions', () => {
   it('strips .js from static imports and re-exports', () => {
@@ -128,5 +131,31 @@ export async function run() {
 export * from './barrel'
 `
     expect(stripRelativeJsExtensions(input)).toBe(expected)
+  })
+})
+
+describe('buildFrameworkExports', () => {
+  it('exports authRouter and middleware for express framework', () => {
+    const exportsCode = buildFrameworkExports('express')
+    expect(exportsCode).toContain("export { authRouter } from './router.js'")
+    expect(exportsCode).toContain("export { sessionMiddleware, requireAuth } from './middleware.js'")
+
+    // After stripRelativeJsExtensions, extensions should be removed cleanly
+    const stripped = stripRelativeJsExtensions(exportsCode)
+    expect(stripped).toContain("export { authRouter } from './router'")
+    expect(stripped).toContain("export { sessionMiddleware, requireAuth } from './middleware'")
+  })
+
+  it('exports authRoutes for hono framework', () => {
+    const exportsCode = buildFrameworkExports('hono')
+    expect(exportsCode).toBe("export { authRoutes } from './routes.js'")
+
+    const stripped = stripRelativeJsExtensions(exportsCode)
+    expect(stripped).toBe("export { authRoutes } from './routes'")
+  })
+
+  it('returns empty string for nextjs and unsupported frameworks', () => {
+    expect(buildFrameworkExports('nextjs')).toBe('')
+    expect(buildFrameworkExports('unknown')).toBe('')
   })
 })

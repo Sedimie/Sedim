@@ -149,6 +149,8 @@ function applySubstitutions(
     DB_INSTANCE_IMPORT: resolveDbInstanceImport(ctx),
     // cookie name — matches the default in framework-config.ts
     COOKIE_NAME: 'auth_session',
+    // framework-conditional router and middleware exports for the barrel index
+    FRAMEWORK_EXPORTS: buildFrameworkExports(ctx.framework.value),
     // conditional UI component exports for the barrel index
     UI_EXPORTS: buildUiExports(selectedFeatures),
     // page content — generated based on selected features
@@ -193,6 +195,20 @@ function resolveDbInstanceImport(ctx: DetectedContext): string {
   // we can't do async file existence checks here (sync context), so use the
   // most common convention and let the comment guide the user if it's wrong
   return `../db/index.js`
+}
+
+// builds framework-conditional entrypoint exports for the barrel index
+export function buildFrameworkExports(framework: string): string {
+  if (framework === 'express') {
+    return [
+      `export { authRouter } from './router.js'`,
+      `export { sessionMiddleware, requireAuth } from './middleware.js'`,
+    ].join('\n')
+  }
+  if (framework === 'hono') {
+    return `export { authRoutes } from './routes.js'`
+  }
+  return ''
 }
 
 // builds conditional UI component exports for the barrel index
