@@ -64,14 +64,27 @@ async function writeConfigTs(projectRoot: string, config: SedimConfig): Promise<
   sf.addStatements(`// Edit this file to override detection results or set preferences.`)
   sf.addStatements(`// Re-run \`sedim init\` to regenerate from scratch.\n`)
 
-  // import
-  sf.addImportDeclaration({
-    isTypeOnly: true,
-    namedImports: ['SedimConfig'],
-    moduleSpecifier: '@sedim/cli',
-  })
-
-  sf.addStatements('\n')
+  // Inlined SedimConfig interface so projects that installed the CLI globally
+  // typecheck without requiring @sedim/cli as a project dependency (fixes #3).
+  sf.addStatements(`export interface SedimConfig {
+  framework: 'nextjs' | 'express' | 'hono'
+  orm: 'drizzle' | 'prisma' | 'none'
+  db: 'pg' | 'mysql' | 'sqlite' | 'none'
+  language: 'typescript' | 'javascript'
+  moduleSystem: 'esm' | 'cjs'
+  sourceStructure: {
+    srcDir: string | null
+    apiDir: string | null
+    routeEntrypoints: string[]
+  }
+  preferences: {
+    ui: 'headless' | 'tailwind' | 'themed'
+    confirmBeforeWrite: boolean
+    dryRunByDefault: boolean
+  }
+  overrides: Record<string, unknown>
+  generatedAt: string
+}\n`)
 
   sf.addVariableStatement({
     declarationKind: VariableDeclarationKind.Const,
@@ -96,23 +109,30 @@ async function writeConfigTs(projectRoot: string, config: SedimConfig): Promise<
 
 // recursively converts a plain object/value into a ts-morph initializer string
 // produces clean TS object literals, not JSON (no quoted keys, proper booleans/nulls)
-function buildObjectLiteral(value: unknown): string {
+export function buildObjectLiteral(value: unknown, depth = 1): string {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
-  if (typeof value === 'string') return `'${value.replace(/'/g, "\\'")}'`
+  if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
   if (typeof value === 'boolean' || typeof value === 'number') return String(value)
 
   if (Array.isArray(value)) {
     if (value.length === 0) return '[]'
-    const items = value.map(v => buildObjectLiteral(v)).join(', ')
+    const items = value.map(v => buildObjectLiteral(v, depth)).join(', ')
     return `[${items}]`
   }
 
   if (typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
     if (entries.length === 0) return '{}'
-    const props = entries.map(([k, v]) => `  ${k}: ${buildObjectLiteral(v)}`).join(',\n')
-    return `{\n${props}\n}`
+    const spaces = '  '.repeat(depth)
+    const closeSpaces = '  '.repeat(depth - 1)
+    const props = entries
+      .map(([k, v]) => {
+        const key = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k) ? k : `'${k}'`
+        return `${spaces}${key}: ${buildObjectLiteral(v, depth + 1)}`
+      })
+      .join(',\n')
+    return `{\n${props}\n${closeSpaces}}`
   }
 
   return String(value)
