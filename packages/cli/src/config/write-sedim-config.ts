@@ -95,24 +95,33 @@ async function writeConfigTs(projectRoot: string, config: SedimConfig): Promise<
 }
 
 // recursively converts a plain object/value into a ts-morph initializer string
-// produces clean TS object literals, not JSON (no quoted keys, proper booleans/nulls)
-function buildObjectLiteral(value: unknown): string {
+// produces clean TS object literals, not JSON (no quoted keys unless required, proper booleans/nulls)
+export function buildObjectLiteral(value: unknown, indentLevel = 1): string {
   if (value === null) return 'null'
   if (value === undefined) return 'undefined'
-  if (typeof value === 'string') return `'${value.replace(/'/g, "\\'")}'`
+  if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
   if (typeof value === 'boolean' || typeof value === 'number') return String(value)
 
   if (Array.isArray(value)) {
     if (value.length === 0) return '[]'
-    const items = value.map(v => buildObjectLiteral(v)).join(', ')
+    const items = value.map(v => buildObjectLiteral(v, indentLevel)).join(', ')
     return `[${items}]`
   }
 
   if (typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
     if (entries.length === 0) return '{}'
-    const props = entries.map(([k, v]) => `  ${k}: ${buildObjectLiteral(v)}`).join(',\n')
-    return `{\n${props}\n}`
+    const indent = '  '.repeat(indentLevel)
+    const closingIndent = '  '.repeat(indentLevel - 1)
+    const props = entries
+      .map(([k, v]) => {
+        const key = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k)
+          ? k
+          : `'${k.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+        return `${indent}${key}: ${buildObjectLiteral(v, indentLevel + 1)}`
+      })
+      .join(',\n')
+    return `{\n${props}\n${closingIndent}}`
   }
 
   return String(value)

@@ -1,9 +1,17 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildPlan } from '../../src/thinker/build-plan'
 import { PlanError } from '../../src/shared/errors'
 import type { DetectedContext, PlanConfig } from '../../src/planning/types'
+
+vi.mock('../../src/thinker/resolve-template', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../src/thinker/resolve-template')>()
+  return {
+    ...actual,
+    resolveTemplate: vi.fn().mockResolvedValue('// mock template content'),
+  }
+})
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fix = (name: string) => path.resolve(__dirname, '../../../../apps/playground', name)

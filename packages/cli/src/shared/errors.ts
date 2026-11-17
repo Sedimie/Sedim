@@ -131,6 +131,24 @@ export function formatError(err: unknown): FormattedError {
     }
   }
 
+  if (
+    err &&
+    typeof err === 'object' &&
+    'message' in err &&
+    typeof (err as { message: unknown }).message === 'string'
+  ) {
+    const message = (err as { message: string }).message
+    const cause =
+      'cause' in err && (err as { cause: unknown }).cause
+        ? String((err as { cause: unknown }).cause)
+        : 'No additional cause information.'
+    const nextAction =
+      'nextAction' in err && typeof (err as { nextAction: unknown }).nextAction === 'string'
+        ? (err as { nextAction: string }).nextAction
+        : 'Run `sedim doctor` for diagnostics.'
+    return { message, cause, nextAction }
+  }
+
   return {
     message: 'An unknown error occurred.',
     cause: JSON.stringify(err, null, 2),
