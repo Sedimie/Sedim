@@ -1,0 +1,34 @@
+{
+  "name": "health",
+  "version": "1.0.0",
+  "layers": {
+    "protocol": ["http"],
+    "logic": ["system-status"],
+    "persistence": {
+      "tables": [],
+      "requires": []
+    },
+    "contract": {
+      "types": "./types.ts"
+    },
+    "adapter": {
+      "frameworks": ["express", "hono", "fastify", "nextjs"],
+      "orms": ["none", "drizzle", "prisma"]
+    },
+    "delivery": {
+      "stamps": ["health-endpoint"]
+    },
+    "ui": {
+      "headless": false,
+      "tailwind": false,
+      "themes": []
+    }
+  },
+  "features": {
+    "providers": ["uptime", "memory-check"]
+  },
+  "requires": {
+    "envVars": [],
+    "peerModules": []
+  }
+}
