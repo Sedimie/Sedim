@@ -4551,6 +4551,14 @@ function getRequiredTables(features) {
 }
 
 // src/plan-config.ts
+function resolveThemeVariant(features) {
+  for (const f of features) {
+    if (["modern", "modern-elegant", "glass", "enterprise"].includes(f)) return "modern";
+    if (["minimal", "minimal-neumorph", "neumorphic"].includes(f)) return "minimal";
+    if (["colorful", "neubrutalist", "neubrutalism"].includes(f)) return "colorful";
+  }
+  return "modern";
+}
 function createAuthPlanConfig(ctx, selectedFeatures) {
   const src = ctx.structure.srcDir ?? "src";
   const authDir = `${src}/sedim/auth`;
@@ -4725,7 +4733,7 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
     outputPath: () => `${authDir}/index.ts`,
     overwriteStrategy: "skip"
   });
-  const uiStyle = selectedFeatures.includes("tailwind") ? "tailwind" : selectedFeatures.includes("themed") ? "themed" : "headless";
+  const uiStyle = selectedFeatures.includes("tailwind") || selectedFeatures.includes("ui:tailwind") ? "tailwind" : selectedFeatures.includes("themed") || selectedFeatures.includes("ui:themed") || selectedFeatures.some((f) => ["modern", "minimal", "colorful", "glass", "enterprise", "minimal-neumorph", "neubrutalist", "neumorphic", "neubrutalism", "modern-elegant"].includes(f)) ? "themed" : "headless";
   if (ctx.frontend && framework !== "nextjs") {
     const fe = ctx.frontend;
     const feAuthDir = `${fe.absPath}/src/sedim/auth`;
@@ -4769,7 +4777,7 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
       });
     }
     if (uiStyle === "themed") {
-      const themeVariant = selectedFeatures.find((f) => ["modern", "minimal", "colorful"].includes(f)) || "modern";
+      const themeVariant = resolveThemeVariant(selectedFeatures);
       templates.push({
         templateKey: `auth/ui/themed/${themeVariant}-tokens.css`,
         outputPath: () => `${feAuthDir}/tokens.css`,
@@ -4818,7 +4826,7 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
       });
     }
     if (uiStyle === "themed") {
-      const themeVariant = selectedFeatures.find((f) => ["modern", "minimal", "colorful"].includes(f)) || "modern";
+      const themeVariant = resolveThemeVariant(selectedFeatures);
       templates.push({
         templateKey: `auth/ui/themed/${themeVariant}-tokens.css`,
         outputPath: () => `${authDir}/ui/tokens.css`,
@@ -5037,5 +5045,6 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
   };
 }
 export {
-  createAuthPlanConfig
+  createAuthPlanConfig,
+  resolveThemeVariant
 };

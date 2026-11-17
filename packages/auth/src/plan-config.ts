@@ -11,6 +11,15 @@ import type { AuthFeature } from './schema/index.js'
 //   - Schema lands at src/sedim/auth/schema.ts — user adds it to their schema barrel
 //   - User never has to hunt across their project to find auth code
 
+export function resolveThemeVariant(features: string[]): 'modern' | 'minimal' | 'colorful' {
+  for (const f of features) {
+    if (['modern', 'modern-elegant', 'glass', 'enterprise'].includes(f)) return 'modern'
+    if (['minimal', 'minimal-neumorph', 'neumorphic'].includes(f)) return 'minimal'
+    if (['colorful', 'neubrutalist', 'neubrutalism'].includes(f)) return 'colorful'
+  }
+  return 'modern'
+}
+
 export function createAuthPlanConfig(
   ctx: DetectedContext,
   selectedFeatures: string[],
@@ -222,8 +231,10 @@ export function createAuthPlanConfig(
   })
 
   // ── UI components — conditional on selected features + ui style ──
-  const uiStyle = selectedFeatures.includes('tailwind') ? 'tailwind'
-    : selectedFeatures.includes('themed') ? 'themed'
+  const uiStyle = (selectedFeatures.includes('tailwind') || selectedFeatures.includes('ui:tailwind'))
+    ? 'tailwind'
+    : (selectedFeatures.includes('themed') || selectedFeatures.includes('ui:themed') || selectedFeatures.some(f => ['modern', 'minimal', 'colorful', 'glass', 'enterprise', 'minimal-neumorph', 'neubrutalist', 'neumorphic', 'neubrutalism', 'modern-elegant'].includes(f)))
+    ? 'themed'
     : 'headless'
 
   // ── Stamp into detected React frontend companion ────────────
@@ -286,7 +297,7 @@ export function createAuthPlanConfig(
 
     // themed CSS tokens
     if (uiStyle === 'themed') {
-      const themeVariant = selectedFeatures.find(f => ['modern', 'minimal', 'colorful'].includes(f)) || 'modern'
+      const themeVariant = resolveThemeVariant(selectedFeatures)
       templates.push({
         templateKey: `auth/ui/themed/${themeVariant}-tokens.css`,
         outputPath: () => `${feAuthDir}/tokens.css`,
@@ -347,7 +358,7 @@ export function createAuthPlanConfig(
 
     // themed CSS tokens
     if (uiStyle === 'themed') {
-      const themeVariant = selectedFeatures.find(f => ['modern', 'minimal', 'colorful'].includes(f)) || 'modern'
+      const themeVariant = resolveThemeVariant(selectedFeatures)
       templates.push({
         templateKey: `auth/ui/themed/${themeVariant}-tokens.css`,
         outputPath: () => `${authDir}/ui/tokens.css`,
