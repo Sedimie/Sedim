@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream'
 import { promisify } from 'node:util'
 import type { DetectedContext, ModuleManifest, PlanConfig } from '../planning/types'
 import { DEFAULT_PACKAGES_URL } from '../shared/constants'
+import { RegistryError } from '../shared/errors.js'
 import { manifestToPlanConfig } from './manifest-to-plan-config.js'
 
 const streamPipeline = promisify(pipeline)
@@ -12,11 +13,39 @@ const streamPipeline = promisify(pipeline)
 // Downloads a remote .js file to a temp location so Node's ESM loader can import it.
 // Node's native ESM loader only supports file:// and data:// URLs — not https://.
 // By downloading to /tmp/ we get a path that import() can handle.
-async function downloadToTemp(url: string, suffix: string): Promise<string> {
+export async function downloadToTemp(
+  url: string,
+  suffix: string,
+  timeoutMs = 15_000,
+): Promise<string> {
   const tmpDir = os.tmpdir()
   const tmpPath = `${tmpDir}/sedim-${suffix}-${Date.now()}.js`
   await new Promise<void>((resolve, reject) => {
     const req = https.get(url, res => {
+      if (res.statusCode === 404) {
+        reject(new Error(`HTTP 404: Not Found`))
+        return
+      }
+      if (res.statusCode === 429) {
+        reject(
+          new RegistryError(
+            `GitHub rate limit exceeded downloading plan config from ${url}`,
+            undefined,
+            'Wait for your GitHub rate limit to reset, or configure a local registry path in sedim.config.ts.',
+          ),
+        )
+        return
+      }
+      if (res.statusCode && res.statusCode >= 500) {
+        reject(
+          new RegistryError(
+            `Registry server returned HTTP ${res.statusCode} when downloading plan config from ${url}`,
+            undefined,
+            'Check https://www.githubstatus.com or retry in a few moments.',
+          ),
+        )
+        return
+      }
       if (res.statusCode !== 200) {
         reject(new Error(`HTTP ${res.statusCode}`))
         return
@@ -25,7 +54,27 @@ async function downloadToTemp(url: string, suffix: string): Promise<string> {
       res.pipe(file)
       file.on('finish', () => file.close(() => resolve()))
     })
-    req.on('error', reject)
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy()
+      reject(
+        new RegistryError(
+          `Connection timed out (${timeoutMs}ms) downloading plan config from ${url}`,
+          undefined,
+          'Check your network connection or verify remote repository availability.',
+        ),
+      )
+    })
+
+    req.on('error', err => {
+      reject(
+        new RegistryError(
+          `Network error downloading plan config from ${url}: ${err.message}`,
+          err,
+          'Check your internet connection or proxy settings.',
+        ),
+      )
+    })
   })
   return tmpPath
 }
@@ -76,8 +125,12 @@ export async function loadPlanConfig(
         selectedFeatures,
       )
     }
-  } catch {
-    // fall through
+  } catch (err: unknown) {
+    // Surface real network failures (rate limits, timeouts, server outages)
+    if (err instanceof RegistryError) {
+      throw err
+    }
+    // 404 or missing custom config falls through to generic manifestToPlanConfig
   }
 
   // 3. generic fallback — works with only a remote manifest

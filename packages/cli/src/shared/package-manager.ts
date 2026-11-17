@@ -17,6 +17,7 @@ export async function installDependencies(
   packages: string[],
   projectRoot: string,
   dev = false,
+  timeoutMs = 120_000,
 ): Promise<void> {
   const pm = detectPackageManager(projectRoot)
 
@@ -41,8 +42,24 @@ export async function installDependencies(
   }
 
   try {
-    await execa(pm, [...args, ...extraFlags[pm]], { cwd: projectRoot, stdio: 'inherit' })
-  } catch (err) {
-    throw new WriteError(`Failed to install packages: ${packages.join(', ')}`, err)
+    await execa(pm, [...args, ...extraFlags[pm]], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+      timeout: timeoutMs,
+    })
+  } catch (err: unknown) {
+    const error = err as { timedOut?: boolean; message?: string }
+    if (error?.timedOut) {
+      throw new WriteError(
+        `Package installation timed out after ${Math.round(timeoutMs / 1000)}s: ${packages.join(', ')}`,
+        err,
+        `Run \`${pm} ${args.join(' ')}\` manually to complete dependency installation.`,
+      )
+    }
+    throw new WriteError(
+      `Failed to install packages: ${packages.join(', ')}`,
+      err,
+      `Check your network connection and run \`${pm} ${args.join(' ')}\` manually.`,
+    )
   }
 }

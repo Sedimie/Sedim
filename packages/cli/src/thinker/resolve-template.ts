@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DetectedContext } from '../planning/types'
 import { DEFAULT_PACKAGES_URL } from '../shared/constants'
+import { RegistryError } from '../shared/errors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -104,14 +105,64 @@ export async function resolveTemplate(
   return content
 }
 
-async function tryFetch(url: string): Promise<string | null> {
+export async function tryFetch(url: string, timeoutMs = 10_000): Promise<string | null> {
+  let res: Response
   try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return res.text()
-  } catch {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      res = await fetch(url, { signal: controller.signal })
+    } finally {
+      clearTimeout(timer)
+    }
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string }
+    if (error?.name === 'AbortError') {
+      throw new RegistryError(
+        `Connection timed out (${timeoutMs}ms) while fetching template from ${url}`,
+        err,
+        'Check your internet connection or configure a local template directory.',
+      )
+    }
+    throw new RegistryError(
+      `Network error connecting to registry at ${url}: ${error?.message ?? 'Unknown error'}`,
+      err,
+      'Check your internet connection or proxy settings.',
+    )
+  }
+
+  // 404 indicates candidate file does not exist at this path/extension — allow normal fallback
+  if (res.status === 404) {
     return null
   }
+
+  // 429 indicates GitHub rate limit exceeded
+  if (res.status === 429) {
+    throw new RegistryError(
+      `GitHub API rate limit exceeded while fetching template from ${url}`,
+      undefined,
+      'Wait for your GitHub rate limit to reset, or configure a local registry in sedim.config.ts.',
+    )
+  }
+
+  // 5xx indicates upstream registry server error
+  if (res.status >= 500) {
+    throw new RegistryError(
+      `Registry server returned HTTP ${res.status} when fetching ${url}`,
+      undefined,
+      'Check https://www.githubstatus.com or retry in a few moments.',
+    )
+  }
+
+  if (!res.ok) {
+    throw new RegistryError(
+      `Unexpected HTTP ${res.status} response from registry at ${url}`,
+      undefined,
+      'Verify your network connection and retry.',
+    )
+  }
+
+  return res.text()
 }
 
 // ── Substitution variables ────────────────────────────────────

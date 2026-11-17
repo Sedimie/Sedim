@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { stripRelativeJsExtensions } from '../../src/thinker/resolve-template'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { RegistryError } from '../../src/shared/errors'
+import {
+  stripRelativeJsExtensions,
+  tryFetch,
+} from '../../src/thinker/resolve-template'
 
 describe('stripRelativeJsExtensions', () => {
   it('strips .js from static imports and re-exports', () => {
@@ -128,5 +132,81 @@ export async function run() {
 export * from './barrel'
 `
     expect(stripRelativeJsExtensions(input)).toBe(expected)
+  })
+})
+
+describe('tryFetch (fixes #6 & #7)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns template content when HTTP 200 OK', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('export const foo = 1', { status: 200 }),
+    )
+
+    const res = await tryFetch('https://raw.github.com/mock/template.ts')
+    expect(res).toBe('export const foo = 1')
+  })
+
+  it('returns null on HTTP 404 to allow falling through to next candidate extension', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('Not Found', { status: 404 }),
+    )
+
+    const res = await tryFetch('https://raw.github.com/mock/missing.ts')
+    expect(res).toBeNull()
+  })
+
+  it('throws RegistryError with nextAction on HTTP 429 rate limit', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('Rate limit exceeded', { status: 429 }),
+    )
+
+    await expect(tryFetch('https://raw.github.com/mock/ratelimit.ts')).rejects.toThrow(
+      RegistryError,
+    )
+    try {
+      await tryFetch('https://raw.github.com/mock/ratelimit.ts')
+    } catch (err: unknown) {
+      const regErr = err as RegistryError
+      expect(regErr.message).toContain('GitHub API rate limit exceeded')
+      expect(regErr.nextAction).toBeDefined()
+      expect(regErr.nextAction).toContain('rate limit to reset')
+    }
+  })
+
+  it('throws RegistryError with nextAction on HTTP 500 server error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('Internal Server Error', { status: 503 }),
+    )
+
+    await expect(tryFetch('https://raw.github.com/mock/server-error.ts')).rejects.toThrow(
+      RegistryError,
+    )
+    try {
+      await tryFetch('https://raw.github.com/mock/server-error.ts')
+    } catch (err: unknown) {
+      const regErr = err as RegistryError
+      expect(regErr.message).toContain('HTTP 503')
+      expect(regErr.nextAction).toContain('githubstatus.com')
+    }
+  })
+
+  it('throws RegistryError with nextAction on network error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(
+      new Error('getaddrinfo ENOTFOUND raw.githubusercontent.com'),
+    )
+
+    await expect(tryFetch('https://raw.github.com/mock/network.ts')).rejects.toThrow(
+      RegistryError,
+    )
+    try {
+      await tryFetch('https://raw.github.com/mock/network.ts')
+    } catch (err: unknown) {
+      const regErr = err as RegistryError
+      expect(regErr.message).toContain('Network error')
+      expect(regErr.nextAction).toContain('internet connection')
+    }
   })
 })
