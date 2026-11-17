@@ -198,3 +198,13 @@ export function buildPasswordResetEmail(opts: { email: string; resetUrl: string 
   const text = `Reset your password\n\nClick this link to reset your password${opts.email ? ` for ${opts.email}` : ''}: ${opts.resetUrl}\n\nIt expires in 1 hour. If you didn't request this, ignore this email.`
   return { to: opts.email, subject: 'Reset your password', html, text }
 }
+
+/**
+ * Creates an email sender instance bound to a specific transport configuration.
+ */
+export function createEmailTransport(config: EmailTransportConfig) {
+  return {
+    send: (opts: EmailOptions) => sendEmail(opts, config),
+    config,
+  }
+}
