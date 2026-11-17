@@ -195,7 +195,7 @@ pnpm --filter @sedim/cli dev   # run CLI in dev mode
 
 These are known and acceptable for v1:
 
-1. **`email.ts` parallel path** — `core/email.ts` and `core/email-transport.ts` both exist. The former is env-var driven nodemailer-only; the latter is the config-driven multi-transport. Both work. The old file is left in place for backwards compat with stamped projects that imported from it.
+1. **`email.ts` consolidation** — `core/email.ts` is consolidated into `core/email-transport.ts`. `email-transport.ts` is the single stamped email implementation supporting multiple transports (nodemailer, resend, postmark, ses). `core/email.ts` re-exports from `email-transport.ts` for backwards compatibility with legacy projects.
 
 2. **`RedisRateLimitStore`** — only in comments. The `RateLimitStore` interface allows any implementation. Implement it when multi-instance production deployment is needed.
 

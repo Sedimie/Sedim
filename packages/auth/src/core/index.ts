@@ -79,3 +79,19 @@ export {
 } from './jwt.js'
 
 export type { JwtAccessToken, RefreshTokenRecord } from './jwt.js'
+
+export {
+  sendEmail,
+  buildMagicLinkEmail,
+  buildPasswordResetEmail,
+} from './email-transport.js'
+
+export type {
+  EmailOptions,
+  EmailTransport,
+  EmailTransportConfig,
+  SmtpConfig,
+  ResendConfig,
+  PostmarkConfig,
+  SesConfig,
+} from './email-transport.js'
