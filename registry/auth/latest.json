@@ -55,6 +55,63 @@
     ],
     "ui": ["headless", "tailwind", "themed"]
   },
+  "featureMeta": {
+    "providers": {
+      "prompt": "Which auth providers?",
+      "type": "multiselect",
+      "options": {
+        "email-password": { "label": "Email + Password", "hint": "classic credential auth" },
+        "magic-link": { "label": "Magic Link", "hint": "passwordless email login" },
+        "oauth-google": { "label": "Google OAuth", "hint": "sign in with Google" },
+        "oauth-github": { "label": "GitHub OAuth", "hint": "sign in with GitHub" },
+        "oauth-discord": { "label": "Discord OAuth", "hint": "sign in with Discord" },
+        "totp": { "label": "TOTP (2FA)", "hint": "Google Authenticator, Authy" }
+      }
+    },
+    "ui": {
+      "prompt": "UI style for auth components?",
+      "type": "select",
+      "options": {
+        "headless": { "label": "Headless", "hint": "unstyled, full control — works with any frontend" },
+        "tailwind": { "label": "Tailwind", "hint": "pre-styled with Tailwind CSS" },
+        "themed": { "label": "Themed", "hint": "pre-built theme variants" }
+      },
+      "subPrompts": {
+        "themed": {
+          "prompt": "Which theme variant?",
+          "type": "select",
+          "options": {
+            "modern": { "label": "Modern", "hint": "Glassmorphism & Gradients" },
+            "minimal": { "label": "Minimal", "hint": "Neumorphism & Soft UI" },
+            "colorful": { "label": "Colorful", "hint": "Neubrutalism" }
+          }
+        }
+      }
+    },
+    "authorization": {
+      "prompt": "Authorization model?",
+      "type": "select",
+      "allowNone": true,
+      "options": {
+        "rbac": { "label": "RBAC", "hint": "role-based access control" },
+        "abac": { "label": "ABAC", "hint": "attribute-based access control" }
+      }
+    },
+    "session": {
+      "prompt": "Session transport?",
+      "type": "select",
+      "options": {
+        "session-cookie": {
+          "label": "Session cookies (recommended)",
+          "hint": "DB-backed sessions, full revocation"
+        },
+        "jwt": {
+          "label": "JWT (stateless API)",
+          "hint": "short-lived access tokens, refresh rotation"
+        }
+      }
+    }
+  },
   "requires": {
     "envVars": [
       "AUTH_SECRET",

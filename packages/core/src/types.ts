@@ -172,16 +172,34 @@ export interface ModuleManifestLayers {
   ui: { headless: boolean; tailwind: boolean; themes: string[] }
 }
 
+export interface FeatureOptionMeta {
+  label: string
+  hint?: string
+}
+
+export interface FeatureCategoryMeta {
+  prompt?: string
+  type?: 'select' | 'multiselect'
+  allowNone?: boolean
+  options?: Record<string, FeatureOptionMeta>
+  subPrompts?: Record<string, {
+    prompt: string
+    type?: 'select' | 'multiselect'
+    options?: Record<string, FeatureOptionMeta>
+  }>
+}
+
 export interface ModuleManifest {
   name: string
   version: string
   layers: ModuleManifestLayers
-  features: {
+  features: Record<string, string[] | undefined> & {
     providers?: string[]
     authorization?: string[]
     ui?: UILevel[]
     session?: string[]
   }
+  featureMeta?: Record<string, FeatureCategoryMeta>
   requires: {
     envVars: string[]
     peerModules: string[]

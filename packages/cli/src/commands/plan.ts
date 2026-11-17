@@ -3,7 +3,7 @@ import { detect } from '../detector/index'
 import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
 import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
-import { buildPlan } from '../thinker/index'
+import { buildPlan, getAllManifestFeatures } from '../thinker/index'
 import { loadModuleManifest } from '../thinker/load-module-manifest'
 import { loadPlanConfig } from '../thinker/load-plan-config'
 
@@ -43,14 +43,9 @@ export async function runPlan(moduleName: string): Promise<void> {
 
   const planSpinner = ui.createSpinner('Building plan...')
 
-  // Flatten all feature categories from the manifest so plan shows the full possible plan.
+  // Flatten all feature categories from the manifest generically so plan shows the full possible plan.
   // plan-config uses selectedFeatures to gate conditional templates (RBAC, JWT, UI, etc.)
-  const allManifestFeatures = [
-    ...(manifest.features.providers ?? []),
-    ...(manifest.features.authorization ?? []),
-    ...(manifest.features.session ?? []),
-    ...(manifest.features.ui ?? []),
-  ]
+  const allManifestFeatures = getAllManifestFeatures(manifest)
 
   let planConfig: import('../planning/types').PlanConfig
   try {
