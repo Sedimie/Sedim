@@ -60,8 +60,42 @@ export function validateSedimConfig(config: unknown): asserts config is SedimCon
     throw new DetectionError('sedim.config.ts is missing sourceStructure', undefined)
   }
 
-  // Overrides is a free-form object but must be an object
-  if (c.overrides !== undefined && (typeof c.overrides !== 'object' || c.overrides === null)) {
-    throw new DetectionError('overrides must be an object')
+  // Overrides validation
+  if (c.overrides !== undefined) {
+    if (typeof c.overrides !== 'object' || c.overrides === null || Array.isArray(c.overrides)) {
+      throw new DetectionError('overrides must be an object')
+    }
+    const o = c.overrides as Record<string, unknown>
+    if (o.framework !== undefined && !VALID_FRAMEWORKS.includes(o.framework as string)) {
+      throw new DetectionError(`Invalid framework override "${o.framework}" in sedim.config.ts`)
+    }
+    if (o.orm !== undefined && !VALID_ORMS.includes(o.orm as string)) {
+      throw new DetectionError(`Invalid orm override "${o.orm}" in sedim.config.ts`)
+    }
+    if (o.db !== undefined && !VALID_DBS.includes(o.db as string)) {
+      throw new DetectionError(`Invalid db override "${o.db}" in sedim.config.ts`)
+    }
+    if (o.language !== undefined && !VALID_LANGUAGES.includes(o.language as string)) {
+      throw new DetectionError(`Invalid language override "${o.language}" in sedim.config.ts`)
+    }
+    if (o.moduleSystem !== undefined && !VALID_MODULE_SYSTEMS.includes(o.moduleSystem as string)) {
+      throw new DetectionError(
+        `Invalid moduleSystem override "${o.moduleSystem}" in sedim.config.ts`,
+      )
+    }
+    if (
+      o.structure !== undefined &&
+      (typeof o.structure !== 'object' || o.structure === null || Array.isArray(o.structure))
+    ) {
+      throw new DetectionError('overrides.structure must be an object')
+    }
+    if (
+      o.codeArchitecture !== undefined &&
+      (typeof o.codeArchitecture !== 'object' ||
+        o.codeArchitecture === null ||
+        Array.isArray(o.codeArchitecture))
+    ) {
+      throw new DetectionError('overrides.codeArchitecture must be an object')
+    }
   }
 }

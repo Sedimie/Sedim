@@ -25,10 +25,12 @@ export async function confirm(message: string, initialValue = false): Promise<bo
 export async function select<T extends string>(
   message: string,
   options: Array<{ value: T; label: string; hint?: string }>,
+  initialValue?: T,
 ): Promise<T> {
   const result = await clack.select({
     message,
     options: options as Parameters<typeof clack.select>[0]['options'],
+    initialValue,
   })
   handleCancel(result)
   return result as T

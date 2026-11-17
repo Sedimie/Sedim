@@ -1,3 +1,4 @@
+import { applyConfigOverrides } from '../config/apply-overrides'
 import type {
   DetectedContext,
   FileToCreate,
@@ -6,6 +7,7 @@ import type {
   InjectionType,
   InstallPlan,
   PlanConfig,
+  SedimConfig,
 } from '../planning/types'
 import { PlanError } from '../shared/errors'
 import { classifyConflicts } from './classify-conflicts'
@@ -44,10 +46,12 @@ function validateManifestVersion(version: string): void {
 // ============================================================
 
 export async function buildPlan(
-  ctx: DetectedContext,
+  rawCtx: DetectedContext,
   config: PlanConfig,
   selectedFeatures: string[],
+  options: { sedimConfig?: Partial<SedimConfig> | null } = {},
 ): Promise<InstallPlan> {
+  const ctx = options.sedimConfig ? applyConfigOverrides(rawCtx, options.sedimConfig) : rawCtx
   // validate manifest version before doing anything
   validateManifestVersion(config.version)
 

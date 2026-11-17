@@ -1,8 +1,13 @@
-import { isSedimInitialised, readSedimConfig } from '../config/index'
+import {
+  applyConfigOverrides,
+  isSedimInitialised,
+  readSedimConfig,
+  validateSedimConfig,
+} from '../config/index'
 import { detect } from '../detector/index'
 import { verifyAndOverrideDetection } from '../detector/override'
 import { bootstrapFrontendCompanion } from '../frontend/bootstrap'
-import type { DetectedContext, InstallPlan, ModuleManifest } from '../planning/types'
+import type { DetectedContext, InstallPlan, ModuleManifest, SedimConfig } from '../planning/types'
 import { readSession, writeSession } from '../session/index'
 import { ensureProjectRoot } from '../shared/ensure-project'
 import * as ui from '../showbaby/index'
@@ -28,6 +33,17 @@ export async function runAdd(
   if (!(await isSedimInitialised(projectRoot))) {
     ui.showError(new Error('Project not initialised. Run `sedim init` first.'))
     process.exit(1)
+  }
+
+  // ── read sedim.config.ts (preferences and overrides) ─────
+  let sedimConfig: SedimConfig | null = null
+  try {
+    sedimConfig = await readSedimConfig(projectRoot)
+    validateSedimConfig(sedimConfig)
+  } catch (err) {
+    if (err instanceof Error) {
+      await logger.warn(projectRoot, `sedim.config.ts reading warning: ${err.message}`)
+    }
   }
 
   // ── check for existing session ───────────────────────────
@@ -58,6 +74,11 @@ export async function runAdd(
     spinner.stop('Detection failed')
     ui.showError(err)
     process.exit(1)
+  }
+
+  // Apply overrides from sedim.config.ts (fixes #31)
+  if (sedimConfig) {
+    ctx = applyConfigOverrides(ctx, sedimConfig)
   }
 
   ui.showDetectionSummary(ctx)
@@ -126,6 +147,11 @@ export async function runAdd(
       ctx.framework.value !== 'nextjs'
         ? ' (requires Next.js OR a React app alongside Express/Hono)'
         : ''
+    const initialUI =
+      sedimConfig?.preferences?.ui && manifest.features.ui.includes(sedimConfig.preferences.ui)
+        ? (sedimConfig.preferences.ui as any)
+        : undefined
+
     selections.ui = await ui.select(
       `UI style for auth components${uiHint}?`,
       manifest.features.ui.map(u => ({
@@ -133,6 +159,7 @@ export async function runAdd(
         label: uiLabels[u]?.label ?? u,
         hint: uiLabels[u]?.hint,
       })),
+      initialUI,
     )
 
     if (selections.ui === 'themed') {
@@ -223,7 +250,8 @@ export async function runAdd(
 
   ui.showPlanSummary(plan)
 
-  if (options.dryRun) {
+  const isDryRun = options.dryRun ?? sedimConfig?.preferences?.dryRunByDefault ?? false
+  if (isDryRun) {
     ui.logNote('Dry run — no files written.', 'Dry Run')
     ui.showOutro('Dry run complete.')
     return
@@ -257,7 +285,11 @@ export async function runAdd(
   }
 
   // ── confirm before write ─────────────────────────────────
-  const proceed = await ui.confirm('Apply this plan?', true)
+  const shouldConfirm = sedimConfig?.preferences?.confirmBeforeWrite ?? true
+  let proceed = true
+  if (shouldConfirm) {
+    proceed = await ui.confirm('Apply this plan?', true)
+  }
   if (!proceed) {
     // Show the OAuth setup guide when user declines so they know how to get credentials
     const oauthProviders = ((selections.providers as string[]) ?? []).filter(p =>

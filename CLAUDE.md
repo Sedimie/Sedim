@@ -199,7 +199,7 @@ These are known and acceptable for v1:
 
 2. **`RedisRateLimitStore`** — only in comments. The `RateLimitStore` interface allows any implementation. Implement it when multi-instance production deployment is needed.
 
-3. **`sedim.config.ts` schema** — `preferences` and `overrides` are stored but `validate-sedim-config.ts` only validates `framework`, `orm`, `db`, `language`, `moduleSystem`. Preferences and overrides are not yet validated or used by the thinker.
+3. **`sedim.config.ts` preferences and overrides** — `preferences` (`ui`, `confirmBeforeWrite`, `dryRunByDefault`) and `overrides` (`framework`, `orm`, `db`, `language`, `moduleSystem`, `structure`, `codeArchitecture`) are validated by `validate-sedim-config.ts` and applied by the thinker and detector via `applyConfigOverrides`.
 
 ---
 
