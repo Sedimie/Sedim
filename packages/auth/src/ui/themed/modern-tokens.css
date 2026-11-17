@@ -1,41 +1,52 @@
-/* src/sedim/auth/ui/tokens.css — Modern theme */
-/* Dark glassmorphism. Override any variable to retheme. */
+/* src/sedim/auth/ui/tokens.css — Modern Elegant theme */
+/* Dark glassmorphism, hairline gradient borders, elevated shadows, and refined typography. */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  --auth-page-bg: #0a0a0f;
-  --auth-bg: transparent;
+  --auth-page-bg: #09090b;
+  --auth-bg: rgba(18, 18, 27, 0.75);
   --auth-fg: #f4f4f5;
-  --auth-muted: #71717a;
-  --auth-border: rgba(255, 255, 255, 0.1);
-  --auth-input-bg: rgba(255, 255, 255, 0.05);
-  --auth-input-focus-ring: #7c3aed;
-  --auth-btn-bg: #7c3aed;
+  --auth-muted: #a1a1aa;
+  --auth-border: rgba(255, 255, 255, 0.12);
+  --auth-input-bg: rgba(255, 255, 255, 0.04);
+  --auth-input-focus-ring: #8b5cf6;
+  --auth-btn-bg: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
   --auth-btn-fg: #ffffff;
-  --auth-btn-hover-bg: #6d28d9;
+  --auth-btn-hover-bg: linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%);
+  --auth-btn-shadow: 0 4px 15px rgba(124, 58, 237, 0.35);
+  --auth-card-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
   --auth-error-fg: #fca5a5;
-  --auth-error-bg: rgba(127, 29, 29, 0.5);
+  --auth-error-bg: rgba(127, 29, 29, 0.4);
   --auth-error-border: rgba(239, 68, 68, 0.3);
   --auth-success-fg: #86efac;
-  --auth-success-bg: rgba(5, 46, 22, 0.5);
+  --auth-success-bg: rgba(5, 46, 22, 0.4);
   --auth-radius: 10px;
+  --auth-card-radius: 20px;
   --auth-font-size-sm: 0.875rem;
-  --auth-font-family: 'Inter', system-ui, sans-serif;
+  --auth-font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 /* Page background — applied to the <main> wrapper in the page file */
 .sedim-auth-page {
   background-color: var(--auth-page-bg);
+  background-image: radial-gradient(ellipse 80% 80% at 50% -20%, rgba(124, 58, 237, 0.15), rgba(255, 255, 255, 0));
   font-family: var(--auth-font-family);
   min-height: 100vh;
 }
 
-/* Card — the form container */
+/* Card — glassmorphic form container */
 .sedim-auth-card {
   font-family: var(--auth-font-family);
+  background: var(--auth-bg) !important;
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
+  border: 1px solid var(--auth-border) !important;
+  border-radius: var(--auth-card-radius) !important;
+  box-shadow: var(--auth-card-shadow) !important;
+  padding: 2.75rem !important;
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
 }
 
 .sedim-auth-card input {
@@ -43,18 +54,18 @@
   color: var(--auth-fg) !important;
   border: 1px solid var(--auth-border) !important;
   border-radius: var(--auth-radius) !important;
-  padding: 0.625rem 0.875rem !important;
+  padding: 0.75rem 1rem !important;
   font-size: var(--auth-font-size-sm) !important;
   font-family: var(--auth-font-family) !important;
   width: 100%;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sedim-auth-card input:focus {
   border-color: var(--auth-input-focus-ring) !important;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25), 0 0 20px rgba(139, 92, 246, 0.15) !important;
 }
 
 .sedim-auth-card input::placeholder {
@@ -64,38 +75,52 @@
 .sedim-auth-card button[type='submit'] {
   background: var(--auth-btn-bg) !important;
   color: var(--auth-btn-fg) !important;
-  border: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: var(--auth-radius) !important;
-  padding: 0.625rem 1rem !important;
+  box-shadow: var(--auth-btn-shadow) !important;
+  padding: 0.75rem 1.25rem !important;
   font-size: var(--auth-font-size-sm) !important;
   font-weight: 600 !important;
   font-family: var(--auth-font-family) !important;
+  letter-spacing: -0.01em;
   width: 100%;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sedim-auth-card button[type='submit']:hover {
   background: var(--auth-btn-hover-bg) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5) !important;
+}
+
+.sedim-auth-card button[type='submit']:active {
+  transform: translateY(0);
 }
 
 /* OAuth buttons */
 .sedim-auth-card button[type='button'] {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
   color: var(--auth-fg) !important;
   border: 1px solid var(--auth-border) !important;
   border-radius: var(--auth-radius) !important;
-  padding: 0.625rem 1rem !important;
+  padding: 0.75rem 1.25rem !important;
   font-size: var(--auth-font-size-sm) !important;
   font-weight: 500 !important;
   font-family: var(--auth-font-family) !important;
   width: 100%;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sedim-auth-card button[type='button']:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-1px);
+}
+
+.sedim-auth-card button[type='button']:active {
+  transform: translateY(0);
 }
 
 /* Password show/hide toggle */
@@ -116,4 +141,28 @@
 
 .password-toggle:hover {
   color: var(--auth-fg) !important;
+  background: transparent !important;
+}
+
+/* Light mode support */
+@media (prefers-color-scheme: light) {
+  :root {
+    --auth-page-bg: #f8fafc;
+    --auth-bg: rgba(255, 255, 255, 0.85);
+    --auth-fg: #0f172a;
+    --auth-muted: #64748b;
+    --auth-border: rgba(0, 0, 0, 0.08);
+    --auth-input-bg: rgba(0, 0, 0, 0.02);
+    --auth-card-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.07), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+  }
+  .sedim-auth-page {
+    background-image: radial-gradient(ellipse 80% 80% at 50% -20%, rgba(124, 58, 237, 0.08), rgba(255, 255, 255, 0));
+  }
+  .sedim-auth-card button[type='button'] {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
+  .sedim-auth-card button[type='button']:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+  }
 }
