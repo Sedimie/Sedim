@@ -26,7 +26,6 @@ export function createAuthPlanConfig(
   if (ctx.language.value === 'javascript') {
     unsupportedReasons.push('JavaScript-only projects are not yet supported. Auth requires TypeScript.')
   }
-  if (framework === 'fastify') unsupportedReasons.push('Fastify adapter not yet supported — coming in v1.1')
   if (framework === 'unknown') unsupportedReasons.push('Framework could not be detected. Run sedim init first.')
   if (orm === 'none') unsupportedReasons.push('No ORM detected. Auth requires Drizzle or Prisma.')
   if (orm === 'unknown') unsupportedReasons.push('ORM could not be detected. Run sedim init first.')
@@ -448,6 +447,20 @@ export function createAuthPlanConfig(
     })
   }
 
+  // Fastify: routes + middleware inside sedim/auth
+  if (framework === 'fastify') {
+    templates.push({
+      templateKey: 'auth/templates/routes/fastify',
+      outputPath: () => `${authDir}/routes.ts`,
+      overwriteStrategy: 'skip',
+    })
+    templates.push({
+      templateKey: 'auth/templates/middleware/fastify',
+      outputPath: () => `${authDir}/middleware.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
   // ── injections — minimal, only where unavoidable ──────────
   const injections: PlanConfig['injections'] = []
 
@@ -521,9 +534,36 @@ export function createAuthPlanConfig(
     })
   }
 
+  // Fastify: one import + one register in entry file
+  if (framework === 'fastify') {
+    injections.push({
+      type: 'import',
+      target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
+      variants: {
+        fastify: {
+          payload: `import { authRoutes } from './sedim/auth'`,
+          anchor: `import`,
+          position: 'after',
+        },
+      },
+    })
+    injections.push({
+      type: 'route',
+      target: (c: DetectedContext) => c.codeArchitecture.appEntrypoint?.file ?? null,
+      variants: {
+        fastify: {
+          payload: `app.register(authRoutes, { prefix: '/auth' })`,
+          anchor: `app.listen`,
+          position: 'before',
+        },
+      },
+    })
+  }
+
   // ── dependencies ──────────────────────────────────────────
   // jose is required by core/oidc.ts, which is always stamped (operations.ts imports it).
   const dependencies = ['argon2', '@oslojs/crypto', '@oslojs/encoding', 'jose']
+  if (framework === 'fastify') dependencies.push('@fastify/cookie')
   if (features.some(f => f.startsWith('oauth-'))) dependencies.push('@oslojs/oauth2')
   // email features use nodemailer (lazy-imported) as the default SMTP transport
   const devDependencies: string[] = []
