@@ -1,0 +1,19 @@
+{
+  "name": "fixture-fastify-prisma-ts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node src/app.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "@fastify/cookie": "^11.0.0",
+    "@prisma/client": "^5.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.0.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.0.0"
+  }
+}
