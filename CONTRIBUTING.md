@@ -63,6 +63,22 @@ pnpm --filter @sedim/auth test   # auth module only
 pnpm --filter @sedim/cli test   # CLI only
 ```
 
+### Developing & Testing Templates Locally
+
+The CLI engine resolves templates with **local-first precedence**:
+1. When working inside the Sedim repository, `sedim add <module>` automatically resolves templates directly from your local `packages/<module>/src/` files before attempting any network fetch.
+2. You can edit any template in `packages/auth/src/` or `packages/auth/src/templates/` and test it immediately in any playground fixture without committing or pushing:
+
+```bash
+# In an app fixture (e.g. apps/playground/nextjs-drizzle-ts):
+sedim add auth
+
+# Or override the local packages directory explicitly:
+SEDIM_PACKAGES_DIR=/path/to/Sedim/packages sedim add auth
+```
+
+3. If a template is not found locally, the CLI falls back seamlessly to the remote GitHub registry.
+
 ---
 
 ## Project Structure

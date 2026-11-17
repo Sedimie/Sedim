@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DetectedContext } from '../planning/types'
@@ -42,57 +44,59 @@ export async function resolveTemplate(
     return generatedKeys[relPath](selectedFeatures, ctx)
   }
 
-  let content: string
+  let content: string | undefined
 
-  // Remote fetch (GitHub raw content)
-  // Try verbatim source first (the files exist at packages/<module>/src/<path>),
-  // then fall back to templates/ dir for UI-only content.
-  // Note: relPath may already contain an extension (e.g. "ui/themed/colorful-tokens.css")
-  // so we always try as-is first before appending any extension.
-  let found = false
-
-  // Try as-is (for files that already have their extension in the templateKey)
-  const asIsUrl = `${packagesUrl}/${moduleName}/src/${relPath}`
-  const asIsFetched = await tryFetch(asIsUrl)
-  if (asIsFetched !== null) {
-    content = asIsFetched
-    found = true
+  // 1. Local-first resolution when running inside monorepo or SEDIM_PACKAGES_DIR is set (fixes #8)
+  const localContent = await tryResolveLocalTemplate(moduleName, relPath)
+  if (localContent !== null) {
+    content = localContent
   } else {
-    // Try with each extension appended (for files without extension in templateKey)
-    for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
-      const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
-      const raw = await tryFetch(url)
-      if (raw !== null) {
-        content = raw
-        found = true
-        break
-      }
-    }
-  }
+    // 2. Remote fetch fallback (GitHub raw content)
+    let found = false
 
-  if (!found) {
-    // Try templates/ dir as fallback (for UI pages that live under templates/)
-    // Try as-is first for files with existing extensions, then with .ts appended
-    const templateAsIs = `${packagesUrl}/${moduleName}/src/templates/${relPath}`
-    const fetchedAsIs = await tryFetch(templateAsIs)
-    if (fetchedAsIs !== null) {
-      content = fetchedAsIs
+    // Try as-is (for files that already have their extension in the templateKey)
+    const asIsUrl = `${packagesUrl}/${moduleName}/src/${relPath}`
+    const asIsFetched = await tryFetch(asIsUrl)
+    if (asIsFetched !== null) {
+      content = asIsFetched
       found = true
     } else {
-      const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
-      const fetched = await tryFetch(templateUrl)
-      if (fetched !== null) {
-        content = fetched
-        found = true
+      // Try with each extension appended (for files without extension in templateKey)
+      for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
+        const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
+        const raw = await tryFetch(url)
+        if (raw !== null) {
+          content = raw
+          found = true
+          break
+        }
       }
     }
-  }
 
-  if (!found) {
-    throw new Error(
-      `Template not found for key "${templateKey}". ` +
-        `Checked:\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]\n  ${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`,
-    )
+    if (!found) {
+      // Try templates/ dir as fallback (for UI pages that live under templates/)
+      // Try as-is first for files with existing extensions, then with .ts appended
+      const templateAsIs = `${packagesUrl}/${moduleName}/src/templates/${relPath}`
+      const fetchedAsIs = await tryFetch(templateAsIs)
+      if (fetchedAsIs !== null) {
+        content = fetchedAsIs
+        found = true
+      } else {
+        const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
+        const fetched = await tryFetch(templateUrl)
+        if (fetched !== null) {
+          content = fetched
+          found = true
+        }
+      }
+    }
+
+    if (!found) {
+      throw new Error(
+        `Template not found for key "${templateKey}". ` +
+          `Checked:\n  ${packagesUrl}/${moduleName}/src/${relPath}.[ts|tsx|css|prisma]\n  ${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`,
+      )
+    }
   }
 
   // Apply substitutions and strip .js extensions
@@ -102,6 +106,76 @@ export async function resolveTemplate(
   }
 
   return content
+}
+
+// ── Local-first template resolution (fixes #8) ───────────────
+// Resolves templates from the local filesystem when running inside the monorepo
+// or when SEDIM_PACKAGES_DIR is configured, allowing module authors to test
+// changes instantly without committing and enabling offline usage.
+export function findLocalMonorepoPackageDir(moduleName: string): string | null {
+  if (process.env.SEDIM_PACKAGES_DIR && fs.existsSync(process.env.SEDIM_PACKAGES_DIR)) {
+    const custom = path.join(process.env.SEDIM_PACKAGES_DIR, moduleName)
+    if (fs.existsSync(path.join(custom, 'src'))) return custom
+  }
+
+  // Check upwards from __dirname for monorepo packages directory
+  let curr = __dirname
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(curr, 'packages', moduleName)
+    if (fs.existsSync(path.join(candidate, 'src'))) {
+      return candidate
+    }
+    const parent = path.dirname(curr)
+    if (parent === curr) break
+    curr = parent
+  }
+
+  // Check relative to cwd
+  const cwdCandidate = path.join(process.cwd(), 'packages', moduleName)
+  if (fs.existsSync(path.join(cwdCandidate, 'src'))) {
+    return cwdCandidate
+  }
+
+  return null
+}
+
+export async function tryResolveLocalTemplate(
+  moduleName: string,
+  relPath: string,
+): Promise<string | null> {
+  const pkgDir = findLocalMonorepoPackageDir(moduleName)
+  if (!pkgDir) return null
+
+  const candidates: string[] = []
+  const hasExt = /\.(ts|tsx|css|prisma|json|js)$/i.test(relPath)
+
+  if (hasExt) {
+    candidates.push(path.join(pkgDir, 'src', relPath))
+    candidates.push(path.join(pkgDir, 'src', 'templates', relPath))
+  } else {
+    candidates.push(path.join(pkgDir, 'src', `${relPath}.ts`))
+    candidates.push(path.join(pkgDir, 'src', 'templates', `${relPath}.ts`))
+    candidates.push(path.join(pkgDir, 'src', `${relPath}.tsx`))
+    candidates.push(path.join(pkgDir, 'src', relPath))
+    candidates.push(path.join(pkgDir, 'src', `${relPath}.css`))
+    candidates.push(path.join(pkgDir, 'src', `${relPath}.prisma`))
+    candidates.push(path.join(pkgDir, 'src', 'templates', relPath))
+  }
+
+  for (const candidatePath of candidates) {
+    if (fs.existsSync(candidatePath)) {
+      try {
+        const stat = await fsPromises.stat(candidatePath)
+        if (stat.isFile()) {
+          return await fsPromises.readFile(candidatePath, 'utf8')
+        }
+      } catch {
+        // file unreadable, fall through
+      }
+    }
+  }
+
+  return null
 }
 
 async function tryFetch(url: string): Promise<string | null> {

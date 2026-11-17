@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { stripRelativeJsExtensions } from '../../src/thinker/resolve-template'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  findLocalMonorepoPackageDir,
+  resolveTemplate,
+  stripRelativeJsExtensions,
+  tryResolveLocalTemplate,
+} from '../../src/thinker/resolve-template'
+import type { DetectedContext } from '../../src/planning/types'
 
 describe('stripRelativeJsExtensions', () => {
   it('strips .js from static imports and re-exports', () => {
@@ -128,5 +134,73 @@ export async function run() {
 export * from './barrel'
 `
     expect(stripRelativeJsExtensions(input)).toBe(expected)
+  })
+})
+
+describe('local-first template resolution (fixes #8)', () => {
+  afterEach(() => {
+    delete process.env.SEDIM_PACKAGES_DIR
+    vi.restoreAllMocks()
+  })
+
+  function makeMockCtx(): DetectedContext {
+    return {
+      framework: { value: 'nextjs', confidence: 1, signals: [] },
+      orm: { value: 'drizzle', confidence: 1, signals: [] },
+      db: { value: 'pg', confidence: 1, signals: [] },
+      language: { value: 'typescript', confidence: 1, signals: [] },
+      moduleSystem: { value: 'esm', confidence: 1, signals: [] },
+      structure: { srcDir: 'src', apiDir: 'src/app/api', routeEntrypoints: [] },
+      codeArchitecture: {
+        pattern: 'app-router',
+        apiDir: 'src/app/api',
+        componentsDir: 'src/components',
+        appEntrypoint: null,
+      },
+      hasSrcDir: true,
+      hasTailwind: true,
+      existingAuth: null,
+      frontend: null,
+    }
+  }
+
+  it('detects local monorepo package directory for auth', () => {
+    const dir = findLocalMonorepoPackageDir('auth')
+    expect(dir).toBeDefined()
+    expect(dir).toContain('auth')
+  })
+
+  it('resolves local template directly from filesystem without network call', async () => {
+    // If local resolution works, fetch is never called
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    const localContent = await tryResolveLocalTemplate('auth', 'core/session')
+    expect(localContent).toBeDefined()
+    expect(typeof localContent).toBe('string')
+    expect(localContent).toContain('validateSession')
+
+    // Fetch should not be called at all
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('resolveTemplate prioritizes local files over remote fetch', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    const ctx = makeMockCtx()
+    const content = await resolveTemplate('auth/core/session', ctx, [])
+    expect(content).toContain('validateSession')
+
+    // No network requests triggered
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('falls back to remote fetch when local template does not exist', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('export const customRemote = true', { status: 200 }),
+    )
+
+    const ctx = makeMockCtx()
+    const content = await resolveTemplate('auth/custom/non-existent-local', ctx, [])
+    expect(content).toContain('export const customRemote = true')
   })
 })
