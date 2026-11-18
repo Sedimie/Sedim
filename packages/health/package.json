@@ -1,0 +1,21 @@
+{
+  "name": "@sedim/health",
+  "version": "0.1.0",
+  "description": "Example stampable healthcheck module for Sedim",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./plan-config": "./src/plan-config.ts"
+  },
+  "scripts": {
+    "build:plan": "tsup src/plan-config.ts --format esm --outDir planConfig --no-dts --clean"
+  },
+  "dependencies": {
+    "@sedim/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

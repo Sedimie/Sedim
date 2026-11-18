@@ -172,14 +172,17 @@ Drizzle and Prisma are currently supported. To add a new ORM (e.g., Prisma but f
 
 Sedim is designed to support any feature module, not just auth. A module lives in `packages/<module-name>/` with its own `plan-config.ts` that tells the CLI what to stamp.
 
+For full interface specifications and schema references, see [Module Authoring Reference](apps/web/content/reference/modules/authoring.md). An end-to-end example module is available in `packages/health/`.
+
 Steps:
 
 1. Create `packages/<module-name>/src/` with your module source
 2. Create `packages/<module-name>/src/plan-config.ts` exporting `create<ModuleName>PlanConfig`
 3. Create `registry/<module-name>/latest.json` with the module manifest
-4. The CLI will automatically pick it up via `load-plan-config.ts`
+4. Build the standalone plan bundle: `pnpm --filter @sedim/<module-name> run build:plan`
+5. The CLI will automatically pick it up via `load-plan-config.ts`
 
-See the auth module's `plan-config.ts` as a reference - it maps feature selections to template keys and output paths.
+See `packages/health/` and `packages/auth/` as live references.
 
 ### Add more features to the auth module
 

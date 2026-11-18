@@ -1,11 +1,16 @@
 import { createWriteStream } from 'node:fs'
 import https from 'node:https'
 import os from 'node:os'
+import path from 'node:path'
 import { pipeline } from 'node:stream'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import type { DetectedContext, ModuleManifest, PlanConfig } from '../planning/types'
 import { DEFAULT_PACKAGES_URL } from '../shared/constants'
+import { exists } from '../shared/fs.js'
 import { manifestToPlanConfig } from './manifest-to-plan-config.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const streamPipeline = promisify(pipeline)
 
@@ -49,10 +54,23 @@ export async function loadPlanConfig(
   selectedFeatures: string[],
   packagesUrl = DEFAULT_PACKAGES_URL,
 ): Promise<PlanConfig> {
-  // 1. try workspace package import — monorepo dev mode
+  // 1. try workspace package import or local package relative path — monorepo dev mode
   try {
     const fnName = `create${capitalize(moduleName)}PlanConfig`
-    const mod = await import(`@sedim/${moduleName}/plan-config`)
+    let mod: Record<string, unknown> | null = null
+    try {
+      mod = (await import(`@sedim/${moduleName}/plan-config`)) as Record<string, unknown>
+    } catch {
+      const localPlanPath = path.resolve(
+        __dirname,
+        '../../../../packages',
+        moduleName,
+        'src/plan-config.ts',
+      )
+      if (await exists(localPlanPath)) {
+        mod = (await import(localPlanPath)) as Record<string, unknown>
+      }
+    }
     if (mod && typeof mod[fnName] === 'function') {
       return (mod[fnName] as (ctx: DetectedContext, features: string[]) => PlanConfig)(
         ctx,

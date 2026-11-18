@@ -47,9 +47,9 @@ export function manifestToPlanConfig(
 
     envVars,
 
-    schemaTables: manifest.layers.persistence.tables,
+    schemaTables: manifest.layers.persistence?.tables ?? [],
 
-    peerContracts: manifest.requires.peerModules.map(mod => ({
+    peerContracts: (manifest.requires?.peerModules ?? []).map(mod => ({
       module: mod,
       provides: [],
       required: true,

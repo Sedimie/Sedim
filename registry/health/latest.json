@@ -1,0 +1,21 @@
+{
+  "name": "health",
+  "version": "0.1.0",
+  "layers": {
+    "protocol": ["http-json"],
+    "logic": ["system-info", "uptime"],
+    "delivery": {
+      "stamps": ["routes"]
+    }
+  },
+  "features": {
+    "checks": [
+      "basic",
+      "detailed"
+    ]
+  },
+  "requires": {
+    "envVars": [],
+    "peerModules": []
+  }
+}

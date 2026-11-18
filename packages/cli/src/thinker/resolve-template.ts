@@ -2,6 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { DetectedContext } from '../planning/types'
 import { DEFAULT_PACKAGES_URL } from '../shared/constants'
+import { exists, readText } from '../shared/fs.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -51,39 +52,64 @@ export async function resolveTemplate(
   // so we always try as-is first before appending any extension.
   let found = false
 
-  // Try as-is (for files that already have their extension in the templateKey)
-  const asIsUrl = `${packagesUrl}/${moduleName}/src/${relPath}`
-  const asIsFetched = await tryFetch(asIsUrl)
-  if (asIsFetched !== null) {
-    content = asIsFetched
-    found = true
-  } else {
-    // Try with each extension appended (for files without extension in templateKey)
-    for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
-      const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
-      const raw = await tryFetch(url)
-      if (raw !== null) {
-        content = raw
+  // Try local monorepo source first (for offline development and local-first resolution)
+  const localSrc = path.resolve(__dirname, '../../../../packages', moduleName, 'src')
+  const localCandidates = [
+    path.join(localSrc, relPath),
+    path.join(localSrc, `${relPath}.ts`),
+    path.join(localSrc, `${relPath}.tsx`),
+    path.join(localSrc, `${relPath}.css`),
+    path.join(localSrc, `${relPath}.prisma`),
+    path.join(localSrc, 'templates', relPath),
+    path.join(localSrc, 'templates', `${relPath}.ts`),
+  ]
+  for (const candidate of localCandidates) {
+    if (await exists(candidate)) {
+      try {
+        content = await readText(candidate)
         found = true
         break
+      } catch {
+        // fall through
       }
     }
   }
 
   if (!found) {
-    // Try templates/ dir as fallback (for UI pages that live under templates/)
-    // Try as-is first for files with existing extensions, then with .ts appended
-    const templateAsIs = `${packagesUrl}/${moduleName}/src/templates/${relPath}`
-    const fetchedAsIs = await tryFetch(templateAsIs)
-    if (fetchedAsIs !== null) {
-      content = fetchedAsIs
+    // Try as-is (for files that already have their extension in the templateKey)
+    const asIsUrl = `${packagesUrl}/${moduleName}/src/${relPath}`
+    const asIsFetched = await tryFetch(asIsUrl)
+    if (asIsFetched !== null) {
+      content = asIsFetched
       found = true
     } else {
-      const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
-      const fetched = await tryFetch(templateUrl)
-      if (fetched !== null) {
-        content = fetched
+      // Try with each extension appended (for files without extension in templateKey)
+      for (const tryExt of ['ts', 'tsx', 'css', 'prisma']) {
+        const url = `${packagesUrl}/${moduleName}/src/${relPath}.${tryExt}`
+        const raw = await tryFetch(url)
+        if (raw !== null) {
+          content = raw
+          found = true
+          break
+        }
+      }
+    }
+
+    if (!found) {
+      // Try templates/ dir as fallback (for UI pages that live under templates/)
+      // Try as-is first for files with existing extensions, then with .ts appended
+      const templateAsIs = `${packagesUrl}/${moduleName}/src/templates/${relPath}`
+      const fetchedAsIs = await tryFetch(templateAsIs)
+      if (fetchedAsIs !== null) {
+        content = fetchedAsIs
         found = true
+      } else {
+        const templateUrl = `${packagesUrl}/${moduleName}/src/templates/${relPath}.ts`
+        const fetched = await tryFetch(templateUrl)
+        if (fetched !== null) {
+          content = fetched
+          found = true
+        }
       }
     }
   }

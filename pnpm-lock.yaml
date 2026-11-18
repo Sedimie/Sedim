@@ -158,6 +158,16 @@ importers:
 
   packages/core: {}
 
+  packages/health:
+    dependencies:
+      '@sedim/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
 packages:
 
   '@alloc/quick-lru@5.2.0':
