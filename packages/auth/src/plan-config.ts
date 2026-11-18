@@ -33,6 +33,11 @@ export function createAuthPlanConfig(
   if (orm !== 'drizzle' && orm !== 'prisma') {
     unsupportedReasons.push(`ORM "${orm}" is not supported yet. Use Drizzle or Prisma.`)
   }
+  if (ctx.frontend && ctx.frontend.framework === 'vue') {
+    unsupportedReasons.push(
+      'Vue frontend companions are not yet supported for auth UI components — coming in v1.2. React frontend companions are supported.',
+    )
+  }
 
   // ── schema tables — only what selected features need ──────
   const schemaTables = getRequiredTables(features)
@@ -229,7 +234,7 @@ export function createAuthPlanConfig(
   // ── Stamp into detected React frontend companion ────────────
   // When Express/Hono is used alongside a React app (monorepo or sibling dirs),
   // we stamp UI components into the frontend so it can talk to the backend API.
-  if (ctx.frontend && framework !== 'nextjs') {
+  if (ctx.frontend && ctx.frontend.framework === 'react' && framework !== 'nextjs') {
     const fe = ctx.frontend
     const feAuthDir = `${fe.absPath}/src/sedim/auth`
 

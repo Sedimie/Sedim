@@ -17,7 +17,7 @@ sedim init         # detects your stack
 sedim add auth     # stamps auth into your project
 ```
 
-The first POC for the stamping model is the Auth Module. Currently supports NextJS (full stack), Hono and Express (with React and Vue frontends).
+The first POC for the stamping model is the Auth Module. Currently supports Next.js (full stack), Express and Hono (with React companion frontends; Vue companion support planned for v1.2).
 
 ---
 

@@ -84,7 +84,7 @@ export async function showNoFrontendPrompt(ctx: DetectedContext): Promise<boolea
   console.log(`  ${chalk.bgYellow.black(' ⚠  No Frontend Detected ')}`)
   console.log()
   console.log(`    Auth UI (LoginForm, SignupForm, OAuthButton, etc.)`)
-  console.log(`    requires a React or Vue companion app to render.`)
+  console.log(`    requires a React companion app to render (Vue support in v1.2).`)
   console.log(`    Without one, only headless API scaffolding is generated.`)
   console.log()
   console.log(`    ${chalk.bold('Want to bootstrap one now?')}`)

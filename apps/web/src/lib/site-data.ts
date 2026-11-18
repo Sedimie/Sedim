@@ -11,19 +11,23 @@ export const heroTagline = {
 export const engineeringHighlights = [
   {
     title: 'Remote registry',
-    detail: 'Every sedim add fetches the latest manifest and templates from GitHub. Small npm package, always current.',
+    detail:
+      'Every sedim add fetches the latest manifest and templates from GitHub. Small npm package, always current.',
   },
   {
     title: 'Conflict-aware planning',
-    detail: 'Detects existing auth, schema collisions, and user-table migrations before a single byte is written.',
+    detail:
+      'Detects existing auth, schema collisions, and user-table migrations before a single byte is written.',
   },
   {
     title: 'Skip strategy',
-    detail: 'Core logic files use overwriteStrategy: skip. Your customizations are never silently overwritten.',
+    detail:
+      'Core logic files use overwriteStrategy: skip. Your customizations are never silently overwritten.',
   },
   {
     title: 'Resumable installs',
-    detail: 'Interrupted mid-stamp? sedim continue picks up from the saved plan snapshot in .sedim/session.json.',
+    detail:
+      'Interrupted mid-stamp? sedim continue picks up from the saved plan snapshot in .sedim/session.json.',
   },
 ] as const
 
@@ -130,8 +134,12 @@ export const workflowSteps = [
 export const stackSupport = {
   frameworks: [
     { name: 'Next.js (App Router)', note: 'Full-stack - frontend + API routes', fullStack: true },
-    { name: 'Express', note: 'Backend with React or Vue frontend', fullStack: false },
-    { name: 'Hono', note: 'Backend with React or Vue frontend', fullStack: false },
+    {
+      name: 'Express',
+      note: 'Backend with React companion frontend (Vue in v1.2)',
+      fullStack: false,
+    },
+    { name: 'Hono', note: 'Backend with React companion frontend (Vue in v1.2)', fullStack: false },
   ],
   orms: ['Drizzle', 'Prisma'],
   databases: ['PostgreSQL', 'MySQL', 'SQLite'],
@@ -171,31 +179,36 @@ export const modules = [
   {
     command: 'sedim add payments',
     category: 'COMMERCE',
-    description: 'Stripe checkout, webhooks, customer portal, recurring billing. Schema and UI included.',
+    description:
+      'Stripe checkout, webhooks, customer portal, recurring billing. Schema and UI included.',
     status: 'roadmap' as const,
   },
   {
     command: 'sedim add notifications',
     category: 'MESSAGING',
-    description: 'Email, push, and in-app notifications. Multi-channel dispatch with typed templates.',
+    description:
+      'Email, push, and in-app notifications. Multi-channel dispatch with typed templates.',
     status: 'roadmap' as const,
   },
   {
     command: 'sedim add chat',
     category: 'REALTIME',
-    description: 'WebSocket messaging, rooms, presence, and UI components. Scale modes from single-node to pub/sub.',
+    description:
+      'WebSocket messaging, rooms, presence, and UI components. Scale modes from single-node to pub/sub.',
     status: 'roadmap' as const,
   },
   {
     command: 'sedim add webrtc',
     category: 'MEDIA',
-    description: 'Peer-to-peer video and audio, screen share, TURN fallback. Self-hostable, inspectable code.',
+    description:
+      'Peer-to-peer video and audio, screen share, TURN fallback. Self-hostable, inspectable code.',
     status: 'roadmap' as const,
   },
   {
     command: 'sedim add ai-rag',
     category: 'AI',
-    description: 'RAG pipelines, embeddings, vector search, and chat UI. pgvector-first, model-agnostic.',
+    description:
+      'RAG pipelines, embeddings, vector search, and chat UI. pgvector-first, model-agnostic.',
     status: 'roadmap' as const,
   },
 ] as const
@@ -344,7 +357,11 @@ export const footerColumns = [
       { label: 'Blog', href: '/blog' },
       { label: 'GitHub', href: 'https://github.com/Sedimie/Sedim', external: true as const },
       { label: 'Discord', href: 'https://discord.com/invite/H7yutstM', external: true as const },
-      { label: 'Contributing', href: 'https://github.com/Sedimie/Sedim/blob/main/CONTRIBUTING.md', external: true as const },
+      {
+        label: 'Contributing',
+        href: 'https://github.com/Sedimie/Sedim/blob/main/CONTRIBUTING.md',
+        external: true as const,
+      },
     ],
   },
 ] as const
@@ -382,7 +399,7 @@ export const philosophyPillars = [
   {
     title: 'Framework & DB agnostic',
     description:
-      'Next.js full-stack, or Express/Hono with React/Vue. Drizzle or Prisma. PostgreSQL, MySQL, SQLite. The Detector adapts - no greenfield required.',
+      'Next.js full-stack, or Express/Hono with React companion frontend (Vue in v1.2). Drizzle or Prisma. PostgreSQL, MySQL, SQLite. The Detector adapts - no greenfield required.',
   },
   {
     title: 'Endless customization',

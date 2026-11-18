@@ -4568,6 +4568,11 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
   if (orm !== "drizzle" && orm !== "prisma") {
     unsupportedReasons.push(`ORM "${orm}" is not supported yet. Use Drizzle or Prisma.`);
   }
+  if (ctx.frontend && ctx.frontend.framework === "vue") {
+    unsupportedReasons.push(
+      "Vue frontend companions are not yet supported for auth UI components \u2014 coming in v1.2. React frontend companions are supported."
+    );
+  }
   const schemaTables = getRequiredTables(features);
   const templates = [];
   templates.push({
@@ -4726,7 +4731,7 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
     overwriteStrategy: "skip"
   });
   const uiStyle = selectedFeatures.includes("tailwind") ? "tailwind" : selectedFeatures.includes("themed") ? "themed" : "headless";
-  if (ctx.frontend && framework !== "nextjs") {
+  if (ctx.frontend && ctx.frontend.framework === "react" && framework !== "nextjs") {
     const fe = ctx.frontend;
     const feAuthDir = `${fe.absPath}/src/sedim/auth`;
     templates.push({
