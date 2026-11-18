@@ -4587,50 +4587,62 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
     overwriteStrategy: "skip"
   });
   templates.push({
-    templateKey: "auth/core/pkce",
-    outputPath: () => `${authDir}/core/pkce.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/totp",
-    outputPath: () => `${authDir}/core/totp.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/jwt",
-    outputPath: () => `${authDir}/core/jwt.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/rbac",
-    outputPath: () => `${authDir}/core/rbac.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/abac",
-    outputPath: () => `${authDir}/core/abac.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/oidc",
-    outputPath: () => `${authDir}/core/oidc.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/totp-crypto",
-    outputPath: () => `${authDir}/core/totp-crypto.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
-    templateKey: "auth/core/email-transport",
-    outputPath: () => `${authDir}/core/email-transport.ts`,
-    overwriteStrategy: "skip"
-  });
-  templates.push({
     templateKey: "auth/core/rate-limit-store",
     outputPath: () => `${authDir}/core/rate-limit-store.ts`,
     overwriteStrategy: "skip"
   });
+  if (selectedFeatures.some((f) => f.startsWith("oauth-"))) {
+    templates.push({
+      templateKey: "auth/core/pkce",
+      outputPath: () => `${authDir}/core/pkce.ts`,
+      overwriteStrategy: "skip"
+    });
+    templates.push({
+      templateKey: "auth/core/oidc",
+      outputPath: () => `${authDir}/core/oidc.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("totp")) {
+    templates.push({
+      templateKey: "auth/core/totp",
+      outputPath: () => `${authDir}/core/totp.ts`,
+      overwriteStrategy: "skip"
+    });
+    templates.push({
+      templateKey: "auth/core/totp-crypto",
+      outputPath: () => `${authDir}/core/totp-crypto.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("jwt")) {
+    templates.push({
+      templateKey: "auth/core/jwt",
+      outputPath: () => `${authDir}/core/jwt.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("rbac")) {
+    templates.push({
+      templateKey: "auth/core/rbac",
+      outputPath: () => `${authDir}/core/rbac.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("abac")) {
+    templates.push({
+      templateKey: "auth/core/abac",
+      outputPath: () => `${authDir}/core/abac.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("magic-link") || selectedFeatures.includes("email-password")) {
+    templates.push({
+      templateKey: "auth/core/email-transport",
+      outputPath: () => `${authDir}/core/email-transport.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
   if (selectedFeatures.some((f) => ["email-password", "magic-link", "totp"].includes(f))) {
     templates.push({
       templateKey: "auth/core/rate-limit",
@@ -4710,6 +4722,53 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
     outputPath: () => `${authDir}/adapters/framework/framework-config.ts`,
     overwriteStrategy: "skip"
   });
+  templates.push({
+    templateKey: "auth/adapters/framework/operations/core",
+    outputPath: () => `${authDir}/adapters/framework/operations/core.ts`,
+    overwriteStrategy: "skip"
+  });
+  if (selectedFeatures.includes("magic-link")) {
+    templates.push({
+      templateKey: "auth/adapters/framework/operations/magic-link",
+      outputPath: () => `${authDir}/adapters/framework/operations/magic-link.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.some((f) => f.startsWith("oauth-"))) {
+    templates.push({
+      templateKey: "auth/adapters/framework/operations/oauth",
+      outputPath: () => `${authDir}/adapters/framework/operations/oauth.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("totp")) {
+    templates.push({
+      templateKey: "auth/adapters/framework/operations/totp",
+      outputPath: () => `${authDir}/adapters/framework/operations/totp.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("jwt")) {
+    templates.push({
+      templateKey: "auth/adapters/framework/operations/jwt",
+      outputPath: () => `${authDir}/adapters/framework/operations/jwt.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("rbac")) {
+    templates.push({
+      templateKey: "auth/adapters/framework/operations/rbac",
+      outputPath: () => `${authDir}/adapters/framework/operations/rbac.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
+  if (selectedFeatures.includes("abac")) {
+    templates.push({
+      templateKey: "auth/adapters/framework/operations/abac",
+      outputPath: () => `${authDir}/adapters/framework/operations/abac.ts`,
+      overwriteStrategy: "skip"
+    });
+  }
   templates.push({
     templateKey: "auth/adapters/framework/operations",
     outputPath: () => `${authDir}/adapters/framework/operations.ts`,
@@ -4968,7 +5027,10 @@ function createAuthPlanConfig(ctx, selectedFeatures) {
       }
     });
   }
-  const dependencies = ["argon2", "@oslojs/crypto", "@oslojs/encoding", "jose"];
+  const dependencies = ["argon2", "@oslojs/crypto", "@oslojs/encoding"];
+  if (features.includes("jwt") || features.some((f) => f.startsWith("oauth-"))) {
+    dependencies.push("jose");
+  }
   if (features.some((f) => f.startsWith("oauth-"))) dependencies.push("@oslojs/oauth2");
   const devDependencies = [];
   if (features.includes("magic-link") || features.includes("email-password")) {

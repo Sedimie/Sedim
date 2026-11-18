@@ -37,6 +37,7 @@ export async function resolveTemplate(
     'ui/pages/forgot-password-page': f => buildForgotPage(f),
     'ui/pages/reset-password-page': f => buildResetPage(f),
     'db/client': (_f, c) => buildDbClientFile(c),
+    'adapters/framework/operations': f => buildOperationsFile(f),
   }
   if (generatedKeys[relPath]) {
     return generatedKeys[relPath](selectedFeatures, ctx)
@@ -675,4 +676,99 @@ function buildDbClientFile(ctx: DetectedContext): string {
     `// Replace with your actual driver setup`,
     `export const db = drizzle(process.env['DATABASE_URL']!)`,
   ].join('\n')
+}
+
+function buildOperationsFile(features: string[]): string {
+  const lines: string[] = [
+    `// ── Generated operations barrel ───────────────────────────────`,
+    `// Wires up active feature operations with type-safe fallback stubs`,
+    `// for unselected features to keep framework route handlers typecheck-clean.`,
+    ``,
+    `export * from './operations/core.js'`,
+  ]
+
+  const hasMagicLink = features.includes('magic-link')
+  const hasOAuth = features.some(f => f.startsWith('oauth-'))
+  const hasTotp = features.includes('totp')
+  const hasJwt = features.includes('jwt')
+  const hasRbac = features.includes('rbac')
+  const hasAbac = features.includes('abac')
+
+  if (hasMagicLink) {
+    lines.push(`export * from './operations/magic-link.js'`)
+  } else {
+    lines.push(
+      ``,
+      `// ── magic-link fallback stubs ──`,
+      `import type { DatabaseAdapter, User } from '../types.js'`,
+      `import type { Session } from '../../core/session.js'`,
+      `import type { AuthResult } from './operations/core.js'`,
+      `export async function createMagicLink(_db: DatabaseAdapter, _email: string, _ip?: string): Promise<AuthResult<{ token: string; userId: string }>> {`,
+      `  return { ok: false, error: 'rate-limited' }`,
+      `}`,
+      `export async function verifyMagicLink(_db: DatabaseAdapter, _token: string): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+      `  return { ok: false, error: 'token-invalid' }`,
+      `}`,
+    )
+  }
+
+  if (hasOAuth) {
+    lines.push(`export * from './operations/oauth.js'`)
+  } else {
+    lines.push(
+      ``,
+      `// ── oauth fallback stubs ──`,
+      `import type { ResolvedAuthConfig } from './framework-config.js'`,
+      `export function createOAuthRedirect(_config: ResolvedAuthConfig, _providerId: string): AuthResult<{ url: URL; codeVerifier: string; state: string }> {`,
+      `  return { ok: false, error: 'oauth-provider-unknown' }`,
+      `}`,
+      `export async function handleOAuthCallback(_db: DatabaseAdapter, _config: ResolvedAuthConfig, _providerId: string, _code: string, _codeVerifier: string): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+      `  return { ok: false, error: 'oauth-provider-unknown' }`,
+      `}`,
+    )
+  }
+
+  if (hasTotp) {
+    lines.push(`export * from './operations/totp.js'`)
+  } else {
+    lines.push(
+      ``,
+      `// ── totp fallback stubs ──`,
+      `export async function setupTotp(_db: DatabaseAdapter, _userId: string, _email: string, _authSecret: string, _issuer?: string): Promise<AuthResult<{ secret: string; uri: string; backupCodes: string[] }>> {`,
+      `  return { ok: false, error: 'totp-already-enabled' }`,
+      `}`,
+      `export async function getTotpUri(_db: DatabaseAdapter, _userId: string, _email: string, _authSecret: string, _issuer?: string): Promise<string | null> {`,
+      `  return null`,
+      `}`,
+      `export async function completeTotpLogin(_db: DatabaseAdapter, _authSecret: string, _userId: string, _code: string, _ip?: string): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+      `  return { ok: false, error: 'totp-not-enabled' }`,
+      `}`,
+      `export async function verifyBackupCode(_db: DatabaseAdapter, _userId: string, _rawCode: string): Promise<AuthResult<{ user: User; token: string; session: Session }>> {`,
+      `  return { ok: false, error: 'backup-code-invalid' }`,
+      `}`,
+    )
+  }
+
+  if (hasJwt) {
+    lines.push(`export * from './operations/jwt.js'`)
+  } else {
+    lines.push(
+      ``,
+      `// ── jwt fallback stubs ──`,
+      `export async function refreshAccessToken(_db: DatabaseAdapter, _rawRefreshToken: string, _authSecret: string): Promise<AuthResult<{ accessToken: string; expiresAt: Date }>> {`,
+      `  return { ok: false, error: 'token-invalid' }`,
+      `}`,
+      `export async function revokeRefreshToken(_db: DatabaseAdapter, _rawRefreshToken: string): Promise<void> {}`,
+    )
+  }
+
+  if (hasRbac) {
+    lines.push(`export * from './operations/rbac.js'`)
+  }
+
+  if (hasAbac) {
+    lines.push(`export * from './operations/abac.js'`)
+  }
+
+  return `${lines.join('\n')}\n`
 }

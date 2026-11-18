@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { stripRelativeJsExtensions } from '../../src/thinker/resolve-template'
+import { stripRelativeJsExtensions, resolveTemplate } from '../../src/thinker/resolve-template'
+import type { DetectedContext } from '../../src/planning/types'
+
+function makeMockCtx(): DetectedContext {
+  return {
+    projectRoot: '/test',
+    packageManager: 'pnpm',
+    language: { value: 'typescript', confidence: 'high', evidence: [] },
+    moduleSystem: { value: 'esm', confidence: 'high', evidence: [] },
+    framework: { value: 'nextjs', confidence: 'high', evidence: [] },
+    orm: { value: 'drizzle', confidence: 'high', evidence: [] },
+    db: { value: 'postgres', confidence: 'high', evidence: [] },
+    structure: { srcDir: 'src', routeEntrypoints: [], middlewareCandidates: [] },
+    schema: { tables: [], probableUserTable: null, authSignals: [], existingAuthDetected: false },
+    codeArchitecture: {
+      routerStyle: 'file-based',
+      layoutStyle: 'app-router',
+      appEntrypoint: null,
+      apiDir: 'src/app/api',
+      providersFile: null,
+      hasBarrelExports: false,
+      importStyle: 'named',
+      injectionAnchors: {},
+    },
+    runtime: { nodeVersion: null },
+    conflicts: { level: 'none', existingAuthDetected: false, signals: [] },
+  }
+}
 
 describe('stripRelativeJsExtensions', () => {
   it('strips .js from static imports and re-exports', () => {
@@ -128,5 +155,44 @@ export async function run() {
 export * from './barrel'
 `
     expect(stripRelativeJsExtensions(input)).toBe(expected)
+  })
+})
+
+describe('resolveTemplate - operations barrel generation (#11)', () => {
+  it('generates operations barrel with core export and fallback stubs for email-password only', async () => {
+    const ctx = makeMockCtx()
+    const content = await resolveTemplate('auth/adapters/framework/operations', ctx, ['email-password'])
+
+    expect(content).toContain(`export * from './operations/core.js'`)
+    expect(content).toContain(`export async function completeTotpLogin`)
+    expect(content).toContain(`export async function refreshAccessToken`)
+    expect(content).toContain(`export async function handleOAuthCallback`)
+    expect(content).toContain(`export async function createMagicLink`)
+
+    // Should NOT import unstamped feature operations
+    expect(content).not.toContain(`export * from './operations/totp.js'`)
+    expect(content).not.toContain(`export * from './operations/jwt.js'`)
+    expect(content).not.toContain(`export * from './operations/oauth.js'`)
+    expect(content).not.toContain(`export * from './operations/magic-link.js'`)
+  })
+
+  it('exports real feature operations when selected', async () => {
+    const ctx = makeMockCtx()
+    const content = await resolveTemplate(
+      'auth/adapters/framework/operations',
+      ctx,
+      ['email-password', 'totp', 'jwt', 'oauth-github', 'magic-link', 'rbac', 'abac'],
+    )
+
+    expect(content).toContain(`export * from './operations/core.js'`)
+    expect(content).toContain(`export * from './operations/totp.js'`)
+    expect(content).toContain(`export * from './operations/jwt.js'`)
+    expect(content).toContain(`export * from './operations/oauth.js'`)
+    expect(content).toContain(`export * from './operations/magic-link.js'`)
+    expect(content).toContain(`export * from './operations/rbac.js'`)
+    expect(content).toContain(`export * from './operations/abac.js'`)
+
+    // Should NOT contain fallback stubs when feature is selected
+    expect(content).not.toContain(`totp-not-enabled`)
   })
 })

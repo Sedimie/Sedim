@@ -9,7 +9,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      include: ['src/core/**/*.ts', 'src/adapters/framework/operations.ts'],
+      include: ['src/core/**/*.ts', 'src/adapters/framework/operations.ts', 'src/adapters/framework/operations/**/*.ts'],
       exclude: ['src/__tests__/**', 'src/templates/**'],
     },
   },

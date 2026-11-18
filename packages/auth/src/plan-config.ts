@@ -56,58 +56,70 @@ export function createAuthPlanConfig(
     outputPath: () => `${authDir}/core/session.ts`,
     overwriteStrategy: 'skip',
   })
-  // pkce, totp, jwt, rbac, abac are always stamped — operations.ts (always stamped)
-  // imports all five unconditionally. Stamping any of them conditionally leaves dangling
-  // imports: a plain email-password install would miss jwt/rbac/abac and fail to compile.
-  // Making operations.ts import only what the user selected is tracked as a follow-up.
-  templates.push({
-    templateKey: 'auth/core/pkce',
-    outputPath: () => `${authDir}/core/pkce.ts`,
-    overwriteStrategy: 'skip',
-  })
-  templates.push({
-    templateKey: 'auth/core/totp',
-    outputPath: () => `${authDir}/core/totp.ts`,
-    overwriteStrategy: 'skip',
-  })
-  templates.push({
-    templateKey: 'auth/core/jwt',
-    outputPath: () => `${authDir}/core/jwt.ts`,
-    overwriteStrategy: 'skip',
-  })
-  templates.push({
-    templateKey: 'auth/core/rbac',
-    outputPath: () => `${authDir}/core/rbac.ts`,
-    overwriteStrategy: 'skip',
-  })
-  templates.push({
-    templateKey: 'auth/core/abac',
-    outputPath: () => `${authDir}/core/abac.ts`,
-    overwriteStrategy: 'skip',
-  })
-  // oidc, totp-crypto, email-transport, rate-limit-store are also imported by the
-  // always-stamped framework adapter (operations.ts / framework-config.ts / the route
-  // factory), so they must always be stamped too — otherwise their imports dangle.
-  templates.push({
-    templateKey: 'auth/core/oidc',
-    outputPath: () => `${authDir}/core/oidc.ts`,
-    overwriteStrategy: 'skip',
-  })
-  templates.push({
-    templateKey: 'auth/core/totp-crypto',
-    outputPath: () => `${authDir}/core/totp-crypto.ts`,
-    overwriteStrategy: 'skip',
-  })
-  templates.push({
-    templateKey: 'auth/core/email-transport',
-    outputPath: () => `${authDir}/core/email-transport.ts`,
-    overwriteStrategy: 'skip',
-  })
   templates.push({
     templateKey: 'auth/core/rate-limit-store',
     outputPath: () => `${authDir}/core/rate-limit-store.ts`,
     overwriteStrategy: 'skip',
   })
+
+  // feature-specific core files — stamped only when corresponding feature is selected
+  if (selectedFeatures.some(f => f.startsWith('oauth-'))) {
+    templates.push({
+      templateKey: 'auth/core/pkce',
+      outputPath: () => `${authDir}/core/pkce.ts`,
+      overwriteStrategy: 'skip',
+    })
+    templates.push({
+      templateKey: 'auth/core/oidc',
+      outputPath: () => `${authDir}/core/oidc.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('totp')) {
+    templates.push({
+      templateKey: 'auth/core/totp',
+      outputPath: () => `${authDir}/core/totp.ts`,
+      overwriteStrategy: 'skip',
+    })
+    templates.push({
+      templateKey: 'auth/core/totp-crypto',
+      outputPath: () => `${authDir}/core/totp-crypto.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('jwt')) {
+    templates.push({
+      templateKey: 'auth/core/jwt',
+      outputPath: () => `${authDir}/core/jwt.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('rbac')) {
+    templates.push({
+      templateKey: 'auth/core/rbac',
+      outputPath: () => `${authDir}/core/rbac.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('abac')) {
+    templates.push({
+      templateKey: 'auth/core/abac',
+      outputPath: () => `${authDir}/core/abac.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('magic-link') || selectedFeatures.includes('email-password')) {
+    templates.push({
+      templateKey: 'auth/core/email-transport',
+      outputPath: () => `${authDir}/core/email-transport.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
 
   // rate limiting — stamped when any auth feature is selected
   if (selectedFeatures.some(f => ['email-password', 'magic-link', 'totp'].includes(f))) {
@@ -201,6 +213,64 @@ export function createAuthPlanConfig(
     outputPath: () => `${authDir}/adapters/framework/framework-config.ts`,
     overwriteStrategy: 'skip',
   })
+
+  // operations/core is always stamped
+  templates.push({
+    templateKey: 'auth/adapters/framework/operations/core',
+    outputPath: () => `${authDir}/adapters/framework/operations/core.ts`,
+    overwriteStrategy: 'skip',
+  })
+
+  // operations feature files stamped only when selected
+  if (selectedFeatures.includes('magic-link')) {
+    templates.push({
+      templateKey: 'auth/adapters/framework/operations/magic-link',
+      outputPath: () => `${authDir}/adapters/framework/operations/magic-link.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.some(f => f.startsWith('oauth-'))) {
+    templates.push({
+      templateKey: 'auth/adapters/framework/operations/oauth',
+      outputPath: () => `${authDir}/adapters/framework/operations/oauth.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('totp')) {
+    templates.push({
+      templateKey: 'auth/adapters/framework/operations/totp',
+      outputPath: () => `${authDir}/adapters/framework/operations/totp.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('jwt')) {
+    templates.push({
+      templateKey: 'auth/adapters/framework/operations/jwt',
+      outputPath: () => `${authDir}/adapters/framework/operations/jwt.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('rbac')) {
+    templates.push({
+      templateKey: 'auth/adapters/framework/operations/rbac',
+      outputPath: () => `${authDir}/adapters/framework/operations/rbac.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  if (selectedFeatures.includes('abac')) {
+    templates.push({
+      templateKey: 'auth/adapters/framework/operations/abac',
+      outputPath: () => `${authDir}/adapters/framework/operations/abac.ts`,
+      overwriteStrategy: 'skip',
+    })
+  }
+
+  // operations barrel — stamped to wire up operations for the framework adapters
   templates.push({
     templateKey: 'auth/adapters/framework/operations',
     outputPath: () => `${authDir}/adapters/framework/operations.ts`,
@@ -522,8 +592,11 @@ export function createAuthPlanConfig(
   }
 
   // ── dependencies ──────────────────────────────────────────
-  // jose is required by core/oidc.ts, which is always stamped (operations.ts imports it).
-  const dependencies = ['argon2', '@oslojs/crypto', '@oslojs/encoding', 'jose']
+  // jose is only required by jwt or oidc (when oauth is selected).
+  const dependencies = ['argon2', '@oslojs/crypto', '@oslojs/encoding']
+  if (features.includes('jwt') || features.some(f => f.startsWith('oauth-'))) {
+    dependencies.push('jose')
+  }
   if (features.some(f => f.startsWith('oauth-'))) dependencies.push('@oslojs/oauth2')
   // email features use nodemailer (lazy-imported) as the default SMTP transport
   const devDependencies: string[] = []
