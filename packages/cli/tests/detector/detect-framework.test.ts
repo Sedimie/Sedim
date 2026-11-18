@@ -28,6 +28,13 @@ describe('detectFramework', () => {
     expect(result.evidence.some(e => e.includes('hono'))).toBe(true)
   })
 
+  it('detects Fastify with high confidence from AST scan and dependencies', async () => {
+    const result = await detectFramework(fix('fastify-prisma-ts'))
+    expect(result.value).toBe('fastify')
+    expect(['high', 'medium']).toContain(result.confidence)
+    expect(result.evidence.some(e => e.includes('fastify'))).toBe(true)
+  })
+
   it('returns unknown with low confidence when no framework signals exist', async () => {
     const result = await detectFramework(fix('empty'))
     expect(result.value).toBe('unknown')

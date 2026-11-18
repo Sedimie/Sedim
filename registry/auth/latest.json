@@ -20,7 +20,7 @@
       "types": "./src/adapters/types.ts"
     },
     "adapter": {
-      "frameworks": ["nextjs", "express", "hono"],
+      "frameworks": ["nextjs", "express", "hono", "fastify"],
       "orms": ["drizzle", "prisma"]
     },
     "delivery": {
