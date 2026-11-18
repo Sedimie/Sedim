@@ -12,12 +12,12 @@ export interface ResetPasswordFormProps {
 }
 
 const s = {
-  form: { display: 'flex', flexDirection: 'column' as const, gap: '1rem', width: '100%', maxWidth: '24rem' },
-  field: { display: 'flex', flexDirection: 'column' as const, gap: '0.375rem' },
+  form: { display: 'flex', flexDirection: 'column' as const, gap: '1rem', width: '100%', maxWidth: '24rem', boxSizing: 'border-box' as const },
+  field: { display: 'flex', flexDirection: 'column' as const, gap: '0.375rem', width: '100%', boxSizing: 'border-box' as const },
   label: { fontSize: 'var(--auth-font-size-sm)', fontWeight: 500, color: 'var(--auth-fg)' },
   input: { borderRadius: 'var(--auth-radius)', border: '1px solid var(--auth-border)', background: 'var(--auth-input-bg)', color: 'var(--auth-fg)', padding: '0.5rem 0.75rem', fontSize: 'var(--auth-font-size-sm)', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
-  error: { fontSize: 'var(--auth-font-size-sm)', color: 'var(--auth-error-fg)', background: 'var(--auth-error-bg)', border: '1px solid var(--auth-error-border)', borderRadius: 'var(--auth-radius)', padding: '0.5rem 0.75rem' },
-  button: { borderRadius: 'var(--auth-radius)', background: 'var(--auth-btn-bg)', color: 'var(--auth-btn-fg)', border: 'none', padding: '0.5rem 1rem', fontSize: 'var(--auth-font-size-sm)', fontWeight: 500, cursor: 'pointer', width: '100%' },
+  error: { fontSize: 'var(--auth-font-size-sm)', color: 'var(--auth-error-fg)', background: 'var(--auth-error-bg)', border: '1px solid var(--auth-error-border)', borderRadius: 'var(--auth-radius)', padding: '0.5rem 0.75rem', wordBreak: 'break-word' as const, boxSizing: 'border-box' as const },
+  button: { borderRadius: 'var(--auth-radius)', background: 'var(--auth-btn-bg)', color: 'var(--auth-btn-fg)', border: 'none', padding: '0.5rem 1rem', fontSize: 'var(--auth-font-size-sm)', fontWeight: 500, cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const },
 }
 
 export function ResetPasswordForm({ token: tokenProp, onSuccess, onError, redirectTo }: ResetPasswordFormProps) {

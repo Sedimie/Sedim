@@ -10,12 +10,12 @@ export interface ForgotPasswordFormProps {
 }
 
 const s = {
-  form: { display: 'flex', flexDirection: 'column' as const, gap: '1rem', width: '100%', maxWidth: '24rem' },
-  field: { display: 'flex', flexDirection: 'column' as const, gap: '0.375rem' },
+  form: { display: 'flex', flexDirection: 'column' as const, gap: '1rem', width: '100%', maxWidth: '24rem', boxSizing: 'border-box' as const },
+  field: { display: 'flex', flexDirection: 'column' as const, gap: '0.375rem', width: '100%', boxSizing: 'border-box' as const },
   label: { fontSize: 'var(--auth-font-size-sm)', fontWeight: 500, color: 'var(--auth-fg)' },
   input: { borderRadius: 'var(--auth-radius)', border: '1px solid var(--auth-border)', background: 'var(--auth-input-bg)', color: 'var(--auth-fg)', padding: '0.5rem 0.75rem', fontSize: 'var(--auth-font-size-sm)', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
-  button: { borderRadius: 'var(--auth-radius)', background: 'var(--auth-btn-bg)', color: 'var(--auth-btn-fg)', border: 'none', padding: '0.5rem 1rem', fontSize: 'var(--auth-font-size-sm)', fontWeight: 500, cursor: 'pointer', width: '100%' },
-  success: { display: 'flex', flexDirection: 'column' as const, gap: '0.75rem', textAlign: 'center' as const },
+  button: { borderRadius: 'var(--auth-radius)', background: 'var(--auth-btn-bg)', color: 'var(--auth-btn-fg)', border: 'none', padding: '0.5rem 1rem', fontSize: 'var(--auth-font-size-sm)', fontWeight: 500, cursor: 'pointer', width: '100%', boxSizing: 'border-box' as const },
+  success: { display: 'flex', flexDirection: 'column' as const, gap: '0.75rem', textAlign: 'center' as const, wordBreak: 'break-word' as const, boxSizing: 'border-box' as const },
 }
 
 export function ForgotPasswordForm({ onSuccess, onError }: ForgotPasswordFormProps) {

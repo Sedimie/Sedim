@@ -48,6 +48,7 @@ const btnStyle = {
   fontSize: 'var(--auth-font-size-sm)',
   fontWeight: 500,
   cursor: 'pointer' as const,
+  boxSizing: 'border-box' as const,
 }
 
 export function OAuthButton({ provider, label, disabled }: OAuthButtonProps) {

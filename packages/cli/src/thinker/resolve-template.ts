@@ -332,19 +332,19 @@ function buildLoginPage(features: string[]): string {
       `// src/app/login/page.tsx — edit freely`,
       `export default function LoginPage() {`,
       `  return (`,
-      `    <main className="sedim-auth-page" style={{ display: 'flex', minHeight: '100vh' }}>`,
+      `    <main className="sedim-auth-page sedim-auth-split-layout">`,
       `      {/* Left panel — form */}`,
-      `      <div style={{ flex: '0 0 480px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem', gap: '2rem' }}>`,
+      `      <div className="sedim-auth-panel">`,
       `        <div>`,
       `          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.375rem' }}>Welcome back</h1>`,
       `          <p style={{ color: 'var(--auth-muted)', fontSize: '0.9375rem', margin: 0 }}>Sign in to continue</p>`,
       `        </div>`,
       `        <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
-      ...body.map(l => '  ' + l),
+      ...body.map(l => `  ${l}`),
       `        </div>`,
       `      </div>`,
       `      {/* Right panel — decorative, replace with your own image */}`,
-      `      <div style={{ flex: 1, background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>`,
+      `      <div className="sedim-auth-decorative">`,
       `        <div style={{ width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }} />`,
       `      </div>`,
       `    </main>`,
@@ -360,7 +360,7 @@ function buildLoginPage(features: string[]): string {
     `// src/app/login/page.tsx — edit freely`,
     `export default function LoginPage() {`,
     `  return (`,
-    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`,
+    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', boxSizing: 'border-box' }}>`,
     `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`,
     `        <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>`,
     `          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.25rem' }}>Welcome back</h1>`,
@@ -438,17 +438,17 @@ function buildSignupPage(features: string[]): string {
       '',
       `export default function SignupPage() {`,
       `  return (`,
-      `    <main className="sedim-auth-page" style={{ display: 'flex', minHeight: '100vh' }}>`,
-      `      <div style={{ flex: '0 0 480px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem', gap: '2rem' }}>`,
+      `    <main className="sedim-auth-page sedim-auth-split-layout">`,
+      `      <div className="sedim-auth-panel">`,
       `        <div>`,
       `          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.375rem' }}>Create account</h1>`,
       `          <p style={{ color: 'var(--auth-muted)', fontSize: '0.9375rem', margin: 0 }}>Get started for free</p>`,
       `        </div>`,
       `        <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>`,
-      ...body.map(l => '  ' + l),
+      ...body.map(l => `  ${l}`),
       `        </div>`,
       `      </div>`,
-      `      <div style={{ flex: 1, background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%)' }} />`,
+      `      <div className="sedim-auth-decorative" />`,
       `    </main>`,
       `  )`,
       `}`,
@@ -460,7 +460,7 @@ function buildSignupPage(features: string[]): string {
     '',
     `export default function SignupPage() {`,
     `  return (`,
-    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`,
+    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', boxSizing: 'border-box' }}>`,
     `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`,
     `        <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>`,
     `          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--auth-fg)', margin: '0 0 0.25rem' }}>Create account</h1>`,
@@ -493,7 +493,7 @@ function buildForgotPage(features: string[] = []): string {
 
   if (!isThemed || themeVariant === 'modern') {
     const wrapper = isThemed
-      ? `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`
+      ? `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', boxSizing: 'border-box' }}>`
       : `    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`
     const card = isThemed
       ? `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`
@@ -522,7 +522,7 @@ function buildForgotPage(features: string[] = []): string {
     ``,
     `export default function ForgotPasswordPage() {`,
     `  return (`,
-    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`,
+    `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', boxSizing: 'border-box' }}>`,
     `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`,
     inner,
     `      </div>`,
@@ -535,7 +535,7 @@ function buildForgotPage(features: string[] = []): string {
 function buildResetPage(features: string[] = []): string {
   const isThemed = features.includes('themed')
   const wrapper = isThemed
-    ? `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>`
+    ? `    <main className="sedim-auth-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem', boxSizing: 'border-box' }}>`
     : `    <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '2rem' }}>`
   const card = isThemed
     ? `      <div className="sedim-auth-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>`
